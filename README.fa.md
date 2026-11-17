@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="README.md">English</a> · <strong>فارسی</strong>
+  <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.es.md">Español</a> · <strong>فارسی</strong> · <a href="https://irdcode.github.io/antigravity-context-monitor/">مستندات وب</a>
 </p>
 
 <p align="center">
@@ -17,7 +17,7 @@
 </div>
 
 <p align="center">
-  <img src="assets/architecture-fa.svg" alt="معماری سه‌لایه مانیتور کانتکست و هم‌زیستی امن با فارسی‌ساز" width="100%">
+  <img src="assets/architecture-fa.svg" alt="معماری سه‌لایه مانیتور کانتکست و حفاظت از اکانت" width="100%">
 </p>
 
 <div dir="rtl">
@@ -55,19 +55,7 @@
 | :--- | :--- |
 | `Launch-Antigravity-Context.bat` | بررسی سلامت، اعمال خودکار پچ + همگام‌سازی Sidecar و اجرای `Antigravity.exe` |
 | `Diagnose-Antigravity-Context.bat` | عیب‌یابی غیرمخرب (`doctor`) بدون تغییر فایل‌ها |
-| `Restore-Antigravity-Context.bat` | حذف تمیز افزونه (در صورت نصب بودن فارسی‌ساز، آن را دست‌نخورده حفظ می‌کند) |
-
----
-
-## افزونه مکمل (`antigravity-persian-rtl`)
-
-برای حل مشکل راست‌به‌چپ متون فارسی/عربی و کدهای اینلاین در محیط Antigravity Desktop می‌توانید از افزونه مکمل استفاده کنید:
-
-- **[antigravity-persian-rtl](https://github.com/IRDcode/antigravity-persian-rtl)** — موتور راست‌به‌چپ آفلاین، فونت وزیرمتن و میانبر `Alt+R` با جداسازی دوجهته (`BiDi Isolate`).
-
-هر دو افزونه دارای **معماری هم‌زیستی مشترک روی `app.asar`** هستند:
-- به هر ترتیبی نصب یا حذف شوند، بلوک‌های کد آن‌ها داخل `dist/utils.js` کاملاً مجزا می‌ماند و فایل پشتیبان `app.asar.bak` سالم حفظ می‌شود.
-- پس از آپدیت‌های رسمی آنتی‌گراویتی، می‌توانید با اسکریپت یکپارچه‌ی `Launch-All-Antigravity-Mods.bat` هر دو افزونه را یک‌جا با یک کلیک دوباره فعال کنید.
+| `Restore-Antigravity-Context.bat` | حذف تمیز افزونه و بازگشت کامل به حالت اصلی |
 
 ---
 

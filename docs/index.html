@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Antigravity Context Monitor — Real-Time Session Context Window &amp; Token Breakdown</title>
+  <meta name="description" content="Real-time session Context Window Monitor, 7-category token breakdown, prompt cache telemetry, isolated subagent tracking, and 128k/200k/1M model ceiling guard for Google Antigravity Desktop.">
+  <meta name="keywords" content="Antigravity Context Monitor, Google Antigravity context window, Antigravity token counter, Antigravity Claude Code context, Antigravity Orchestrator tokens, Antigravity Sidecar extension, Gemini 1M context monitor, Claude 200k context limit">
+  <link rel="canonical" href="https://irdcode.github.io/antigravity-context-monitor/">
+  <link rel="alternate" hreflang="en" href="https://irdcode.github.io/antigravity-context-monitor/">
+  <link rel="alternate" hreflang="x-default" href="https://irdcode.github.io/antigravity-context-monitor/">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Antigravity Context Monitor — Live Context Window &amp; Token Telemetry">
+  <meta property="og:description" content="Offline, account-safe Context Window Monitor for Google Antigravity Desktop: exact PLANNER_RESPONSE token counts, 18 model ceilings (128k/200k/1M), 7-category breakdown, and Sidecar UI.">
+  <meta property="og:url" content="https://irdcode.github.io/antigravity-context-monitor/">
+  <meta name="twitter:card" content="summary">
+  <meta name="theme-color" content="#050505">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "name": "Antigravity Context Monitor",
+        "operatingSystem": "Windows 10, Windows 11, macOS, Linux",
+        "applicationCategory": "DeveloperApplication",
+        "softwareVersion": "1.0.0",
+        "license": "https://github.com/IRDcode/antigravity-context-monitor/blob/main/LICENSE",
+        "codeRepository": "https://github.com/IRDcode/antigravity-context-monitor",
+        "url": "https://irdcode.github.io/antigravity-context-monitor/",
+        "description": "Real-time session Context Window Monitor, 7-category token breakdown, prompt cache telemetry, isolated subagent tracker, and multi-model handoff guard for Google Antigravity Desktop.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Why does Google Antigravity not show a Context Window bar by default?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Unlike single-loop CLI tools, Antigravity splits work across Planning and Execution phases in Orchestrator mode, isolates subagent sessions via invoke_subagent, and lazy-loads skills and MCP schemas. Antigravity still writes exact per-turn token counts to local session transcript.jsonl files, which Antigravity Context Monitor reads passively."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How are tokens calculated and attributed across categories?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Active session usage comes directly from the latest PLANNER_RESPONSE record: input_tokens + cache_read_tokens + output_tokens. The monitor reconciles 100% of that exact total across System & Rules, MCP Servers & Tools, Skills & Plugins, Files & Codebase, Terminal & Tasks, Chat Messages, and Reasoning & Subagents."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is Antigravity Context Monitor safe for my account?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. It operates strictly read-only on local transcript.jsonl files, makes zero network calls, never modifies API headers, prompts, or auth tokens, and enforces a strict 127.0.0.1 origin guard on all Electron IPC handlers."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does it support 128k, 200k, and 1M context ceilings accurately?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. All 18 official Antigravity models are mapped to their real context limits: 128k for GPT-OSS 120B, 200k for Claude Opus/Sonnet 5.5, and 1M for Gemini 3.8/4 and Orchestrator, with overflow alerts before handing a heavy session to a narrower model tier."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+
+  <style>
+    :root {
+      --bg: #050505;
+      --surface: #0D0D10;
+      --surface-2: #121216;
+      --border: #1F1F24;
+      --text: #F5F5F5;
+      --muted: #A1A1AA;
+      --dim: #71717A;
+      --ok: #34D399;
+      --warn: #F59E0B;
+      --bad: #EF4444;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; overflow-x: clip; }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+    body {
+      margin: 0;
+      overflow-x: clip;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap {
+      width: 100%;
+      max-width: 1020px;
+      min-width: 0;
+      margin: 0 auto;
+      padding: 32px 20px 64px;
+    }
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13.5px;
+    }
+    nav .brand {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: var(--text);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    nav .links {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    a { color: #E4E4E7; text-decoration: none; }
+    a:hover { text-decoration: underline; color: #FFFFFF; }
+    .hero {
+      padding: 40px 0 30px;
+      border-bottom: 1px solid var(--border);
+    }
+    .eyebrow {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11.5px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-bottom: 10px;
+    }
+    h1 {
+      font-size: clamp(2rem, 4.4vw, 3rem);
+      line-height: 1.15;
+      margin: 0 0 14px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+    .lead {
+      font-size: 1.06rem;
+      color: #D4D4DC;
+      max-width: 68ch;
+      margin: 0 0 22px;
+    }
+    .cta-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-block;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+    }
+    .btn-primary {
+      background: #F5F5F5;
+      color: #050505;
+      border-color: #F5F5F5;
+    }
+    .btn-primary:hover {
+      background: #E4E4E7;
+      color: #050505;
+      text-decoration: none;
+    }
+    section {
+      padding: 32px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    h2 {
+      font-size: 1.4rem;
+      margin: 0 0 14px;
+      color: var(--text);
+      overflow-wrap: anywhere;
+    }
+    h3 {
+      font-size: 1.02rem;
+      margin: 0 0 8px;
+      color: var(--text);
+      overflow-wrap: anywhere;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+      gap: 16px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+      gap: 14px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+    .card p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+    .tier-num {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 1.45rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    :not(pre) > code {
+      background: rgba(255, 255, 255, 0.06);
+      padding: 1px 6px;
+      border-radius: 5px;
+      font-size: 0.88em;
+      white-space: nowrap;
+    }
+    pre {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      max-width: 100%;
+      overflow-x: auto;
+      font-size: 0.9rem;
+      color: #E4E4E7;
+    }
+    .faq-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 18px;
+      margin-bottom: 12px;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+    @media (max-width: 640px) {
+      .wrap { padding: 20px 16px 48px; }
+      .grid-2, .grid-3 { grid-template-columns: minmax(0, 1fr); }
+      :not(pre) > code {
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+    }
+    .faq-item h3 { margin-bottom: 6px; font-size: 1rem; }
+    .faq-item p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+    footer {
+      padding-top: 24px;
+      color: var(--dim);
+      font-size: 0.88rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <nav aria-label="Primary navigation">
+      <span class="brand">antigravity-context-monitor</span>
+      <div class="links">
+        <a href="#features">Features</a>
+        <a href="#models">Models</a>
+        <a href="#faq">FAQ</a>
+        <a href="https://github.com/IRDcode/antigravity-context-monitor/blob/main/README.zh-CN.md">简体中文</a>
+        <a href="https://github.com/IRDcode/antigravity-context-monitor/blob/main/README.ja.md">日本語</a>
+        <a href="https://github.com/IRDcode/antigravity-context-monitor/blob/main/README.es.md">Español</a>
+        <a href="https://github.com/IRDcode/antigravity-context-monitor/blob/main/README.fa.md">فارسی</a>
+        <a href="https://github.com/IRDcode/antigravity-context-monitor">GitHub</a>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <div class="eyebrow">IRDCODE · GOOGLE ANTIGRAVITY CONTEXT TELEMETRY</div>
+      <h1>Real-Time Context Window Monitor for Google Antigravity Desktop</h1>
+      <p class="lead">
+        Live session token meter, 7-category allocation breakdown, prompt cache hit-rate tracking, isolated subagent visibility, and cross-model overflow guard (<code>128k</code>, <code>200k</code>, <code>1M</code>) — powered strictly by passive local transcript reads.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://github.com/IRDcode/antigravity-context-monitor/releases/latest">Download Latest Release</a>
+        <a class="btn" href="https://github.com/IRDcode/antigravity-context-monitor">View Source on GitHub</a>
+      </div>
+    </header>
+
+    <main>
+      <section id="models" aria-labelledby="models-heading">
+        <h2 id="models-heading">Exact Model Ceilings &amp; Focus Sweet Spots</h2>
+        <div class="grid-3">
+          <article class="card">
+            <div class="tier-num">128k</div>
+            <h3>GPT-OSS 120B</h3>
+            <p><code>128,000</code> token ceiling with an <code>80k</code> reasoning focus budget. Triggers immediate overflow warnings on heavier sessions.</p>
+          </article>
+          <article class="card">
+            <div class="tier-num">200k</div>
+            <h3>Claude Opus &amp; Sonnet 5.5</h3>
+            <p><code>200,000</code> token ceiling (High / Medium / Low) with a <code>120k</code> focus marker. Never misreported as a 1M window.</p>
+          </article>
+          <article class="card">
+            <div class="tier-num">1M</div>
+            <h3>Gemini 3.8 / 4 &amp; Orchestrator</h3>
+            <p><code>1,000,000</code> token ceiling with a <code>150k</code> focus marker plus <code>PLANNING ↔ EXECUTION</code> phase handoff tracking.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="features" aria-labelledby="features-heading">
+        <h2 id="features-heading">Architecture &amp; Account Safety</h2>
+        <div class="grid-2">
+          <article class="card">
+            <h3>7-Category Allocation Breakdown</h3>
+            <p>Reconciles 100% of live <code>PLANNER_RESPONSE</code> tokens (<code>input_tokens + cache_read_tokens + output_tokens</code>) across System &amp; Rules, MCP Servers, Skills &amp; Plugins, Files, Terminal, Chat Messages, and Reasoning &amp; Subagents.</p>
+          </article>
+          <article class="card">
+            <h3>Dual Native Surfaces</h3>
+            <p>Includes both a lightweight titlebar live pill + popover (<code>Alt+C</code>) and a full-height official Sidecar Auxiliary Pane plugin installed to <code>~/.gemini/config/plugins/context-monitor/</code>.</p>
+          </article>
+          <article class="card">
+            <h3>Subagent &amp; Cache Telemetry</h3>
+            <p>Monitors prompt cache hit percentage, detects cache-miss resets, and tracks how many tokens child <code>invoke_subagent</code> sessions kept out of your parent context.</p>
+          </article>
+          <article class="card">
+            <h3>100% Passive &amp; Account-Safe</h3>
+            <p>Zero network calls, zero auth/header hooks, strict <code>^https?://127\.0\.0\.1:\d+</code> origin lock, and clean SHA-256 <code>.bak</code> restore.</p>
+          </article>
+        </div>
+        <pre>npm install --omit=dev
+npm run doctor                 # Non-destructive health check
+npm run patch                  # Apply ASAR patch + sync Sidecar plugin
+npm run analyze -- --json      # Inspect active session context in CLI
+npm run restore                # Revert cleanly to stock Antigravity Desktop</pre>
+      </section>
+
+      <section id="faq" aria-labelledby="faq-heading">
+        <h2 id="faq-heading">Frequently Asked Questions</h2>
+        <div class="faq-item">
+          <h3>Why does Google Antigravity not show a Context Window bar by default?</h3>
+          <p>Unlike single-loop CLI tools, Antigravity splits work across Planning and Execution phases in Orchestrator mode, isolates subagent sessions via <code>invoke_subagent</code>, and lazy-loads skills and MCP schemas. Antigravity still writes exact per-turn token counts to local session <code>transcript.jsonl</code> files, which Antigravity Context Monitor reads passively.</p>
+        </div>
+        <div class="faq-item">
+          <h3>How are tokens calculated and attributed across categories?</h3>
+          <p>Active session usage comes directly from the latest <code>PLANNER_RESPONSE</code> record: <code>input_tokens + cache_read_tokens + output_tokens</code>. The monitor reconciles 100% of that exact total across System &amp; Rules, MCP Servers &amp; Tools, Skills &amp; Plugins, Files &amp; Codebase, Terminal &amp; Tasks, Chat Messages, and Reasoning &amp; Subagents.</p>
+        </div>
+        <div class="faq-item">
+          <h3>Is Antigravity Context Monitor safe for my account?</h3>
+          <p>Yes. It operates strictly read-only on local <code>transcript.jsonl</code> files, makes zero network calls, never modifies API headers, prompts, or auth tokens, and enforces a strict <code>127.0.0.1</code> origin guard on all Electron IPC handlers.</p>
+        </div>
+        <div class="faq-item">
+          <h3>Does it support 128k, 200k, and 1M context ceilings accurately?</h3>
+          <p>Yes. All 18 official Antigravity models are mapped to their real context limits: <code>128k</code> for GPT-OSS 120B, <code>200k</code> for Claude Opus/Sonnet 5.5, and <code>1M</code> for Gemini 3.8/4 and Orchestrator, with overflow alerts before handing a heavy session to a narrower model tier.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>MIT License · Built by <a href="https://github.com/IRDcode">IRDcode</a></span>
+      <span>Verified on Google Antigravity Desktop v2.32.1</span>
+    </footer>
+  </div>
+</body>
+</html>
