@@ -1,0 +1,39 @@
+{
+  "name": "antigravity-context-monitor",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Real-time session context window monitor, per-category token breakdown, multi-model handoff guard, and Sidecar UI extension for Google Antigravity Desktop.",
+  "keywords": [
+    "antigravity",
+    "google-antigravity",
+    "context-window",
+    "tokens",
+    "monitor",
+    "telemetry",
+    "sidecar",
+    "electron",
+    "asar",
+    "windows"
+  ],
+  "homepage": "https://github.com/IRDcode/antigravity-context-monitor",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IRDcode/antigravity-context-monitor.git"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "status": "node src/patcher.mjs status",
+    "doctor": "node src/patcher.mjs doctor",
+    "patch": "node src/patcher.mjs patch",
+    "restore": "node src/patcher.mjs restore",
+    "sync": "node src/patcher.mjs sync",
+    "analyze": "node src/patcher.mjs analyze",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@electron/asar": "^4.2.0"
+  }
+}

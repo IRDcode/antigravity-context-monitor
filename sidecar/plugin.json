@@ -1,0 +1,12 @@
+{
+  "name": "context-monitor",
+  "displayName": "Context Monitor",
+  "version": "1.0.0",
+  "description": "Live session context window meter, 7-category token breakdown, prompt cache stats, and multi-model handoff guard.",
+  "logo": "assets/logo.svg",
+  "suggestedPrompts": [
+    "Analyze which files and tools are consuming the most context in this session",
+    "Check whether this session still fits inside Claude 5.5 (200k) or GPT-OSS (128k)",
+    "Generate a compact handoff summary before resetting or compacting context"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "command": "node",
+  "args": ["main.mjs"],
+  "restart_policy": "always",
+  "display_name": "Context Window",
+  "description": "Live session context window telemetry, category attribution, and multi-model handoff guard.",
+  "has_web_ui": true,
+  "ui_config": {
+    "display_name": "Context Window",
+    "views": [
+      {
+        "path": "/",
+        "entrypoint": "SIDECAR_UI_ENTRYPOINT_AUX_PANE",
+        "title": "Context Window"
+      }
+    ]
+  }
+}

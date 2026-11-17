@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Context Window</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/preload.js"></script>
+</head>
+<body>
+  <main class="panel">
+    <header class="panel-header">
+      <div class="title-row">
+        <h1>Context Window</h1>
+        <div class="badges">
+          <span id="phase-badge" class="badge">–</span>
+          <button id="refresh-btn" type="button" class="icon-btn" title="Refresh telemetry">↺</button>
+        </div>
+      </div>
+      <p id="session-subtitle" class="muted small">Connecting to transcript telemetry…</p>
+    </header>
+
+    <section class="card controls-grid">
+      <div class="field">
+        <label for="conv-select">Session</label>
+        <select id="conv-select"></select>
+      </div>
+      <div class="field">
+        <label for="model-select">Model Ceiling</label>
+        <select id="model-select"></select>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="meter-head">
+        <div class="big-readout">
+          <span id="tok-used">–</span>
+          <span id="tok-ceiling" class="muted">/ –</span>
+        </div>
+        <span id="zone-badge" class="badge">–</span>
+      </div>
+      <div class="bar-track">
+        <div id="bar-fill" class="bar-fill" style="width:0%"></div>
+        <div id="attn-tick" class="attn-tick" style="left:15%"></div>
+      </div>
+      <div class="meter-foot muted small">
+        <span id="tok-remaining">–</span>
+        <span id="tok-attention">–</span>
+      </div>
+      <div id="handoff-alert" class="alert" hidden></div>
+      <div id="switch-history" class="small muted" hidden></div>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <h2>Cross-Model Handoff Matrix</h2>
+        <span id="handoff-count" class="muted small">0 switches</span>
+      </div>
+      <div id="handoff-matrix" class="matrix-grid"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <h2>Token Allocation Breakdown</h2>
+        <span id="turn-count" class="muted small">0 turns</span>
+      </div>
+      <div id="stack-bar" class="stack-bar"></div>
+      <div id="cat-list" class="cat-list"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <h2>Prompt Cache &amp; Runtime</h2>
+        <span id="log-mode" class="muted small">Full Log</span>
+      </div>
+      <div class="kv-grid">
+        <div><span class="k">Cache Hit</span><strong id="kv-hit">–</strong></div>
+        <div><span class="k">Cached</span><strong id="kv-cached">–</strong></div>
+        <div><span class="k">Fresh In</span><strong id="kv-fresh">–</strong></div>
+        <div><span class="k">Misses</span><strong id="kv-misses">–</strong></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <h2>Isolated Subagents</h2>
+        <span id="offloaded-total" class="muted small">0 offloaded</span>
+      </div>
+      <div id="subagent-list" class="sub-list"></div>
+    </section>
+
+    <footer class="actions">
+      <button id="copy-summary-btn" type="button" class="secondary">Copy /compact Summary</button>
+    </footer>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
