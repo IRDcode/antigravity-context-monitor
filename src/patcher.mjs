@@ -12,13 +12,27 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 
-export const PATCH_MARKER = '/* ANTIGRAVITY CONTEXT MONITOR v1.0 */';
+export const PATCH_MARKER = '/* ANTIGRAVITY CONTEXT MONITOR v2.0 */';
 export const PATCH_END = '/* END ANTIGRAVITY CONTEXT MONITOR */';
-export const ANCHOR = 'void win.loadURL(url);';
+export const ANCHOR = 'void loadHubWindowUrl(win, url, { skipBootstrapMint });';
+export const LEGACY_ANCHOR = 'void win.loadURL(url);';
+export const FALLBACK_ANCHOR = 'await win.loadURL(url);';
+
+// Ordered by priority:
+// 1) v2.34.0+ createWindow -> loadHubWindowUrl(win, url, ...) where win & hubContents are in scope once per window
+// 2) Legacy v2.32/v2.33 createWindow -> void win.loadURL(url);
+// 3) Fallback invokeWindowLoadUrl -> await win.loadURL(url);
+const ANCHOR_PATTERNS = [
+    /\bvoid\s+loadHubWindowUrl\(\s*win\s*,\s*url(?:\s*,\s*(?:\{[^;\n]*\}|[A-Za-z_$][\w$.]*))?\s*\)\s*;/,
+    /\bvoid\s+win\.loadURL\(\s*url\s*\)\s*;/,
+    /\bawait\s+win\.loadURL\(\s*url\s*\)\s*;/
+];
 
 const CURRENT_BLOCK_RE = /\/\* ANTIGRAVITY CONTEXT MONITOR[\s\S]*?\/\* END ANTIGRAVITY CONTEXT MONITOR \*\/\r?\n?/;
+const PAYLOAD_HASH_RE = /\/\* AG_CTX_PAYLOAD_SHA256:\s*([0-9a-f]{12,64})\s*\*\//i;
 const RTL_START_RE = /\/\* (?:ANTIGRAVITY PERSIAN RTL|ANTIGRAVITY RTL HARDENED|ANTIGRAVITY RTL PATCH|FALIZ RTL CORE|FANTIGRAVITY RTL CORE)/;
 const RTL_BLOCK_RE = /\/\* (?:ANTIGRAVITY PERSIAN RTL|ANTIGRAVITY RTL HARDENED|ANTIGRAVITY RTL PATCH|FALIZ RTL CORE|FANTIGRAVITY RTL CORE)[\s\S]*?\/\* END (?:ANTIGRAVITY PERSIAN RTL|ANTIGRAVITY RTL HARDENED|ANTIGRAVITY RTL PATCH|FALIZ RTL CORE|FANTIGRAVITY RTL CORE) \*\//;
+const WRAPPED_ANCHOR_TAIL_RE = /((?:void|await)\s+(?:win\.loadURL|loadHubWindowUrl)\([^\n;]*\);)\s*\/\* END [^*]+\*\/\s*$/;
 
 const ASAR_BLOCK_SIZE = 4 * 1024 * 1024;
 const UTILS_REL_PATH = 'dist/utils.js';
@@ -35,6 +49,23 @@ export class PatchError extends Error {
         this.details = details;
         this.exitCode = exitCode;
     }
+}
+
+export function findInjectionAnchor(code) {
+    if (typeof code !== 'string') return null;
+    for (const pattern of ANCHOR_PATTERNS) {
+        const match = pattern.exec(code);
+        if (match) return match[0];
+    }
+    return null;
+}
+
+export function extractPayloadHash(code) {
+    if (typeof code !== 'string') return null;
+    const blockMatch = CURRENT_BLOCK_RE.exec(code);
+    if (!blockMatch) return null;
+    const hashMatch = PAYLOAD_HASH_RE.exec(blockMatch[0]);
+    return hashMatch ? hashMatch[1].toLowerCase() : null;
 }
 
 export function getCandidateAppAsarPaths() {
@@ -224,14 +255,25 @@ function stripOwnPatch(code) {
     return code.replace(CURRENT_BLOCK_RE, '');
 }
 
+function stripRtlBlock(code) {
+    const match = RTL_BLOCK_RE.exec(code);
+    if (!match) return code;
+    const innerAnchor = WRAPPED_ANCHOR_TAIL_RE.exec(match[0]);
+    if (innerAnchor) {
+        return code.slice(0, match.index) + innerAnchor[1] + code.slice(match.index + match[0].length);
+    }
+    let end = match.index + match[0].length;
+    if (code.slice(end, end + 2) === '\r\n') end += 2;
+    else if (code[end] === '\n') end += 1;
+    return code.slice(0, match.index) + code.slice(end);
+}
+
 function stripAllKnownMods(code) {
     let out = code;
     if (CURRENT_BLOCK_RE.test(out)) {
         out = out.replace(CURRENT_BLOCK_RE, '');
     }
-    if (RTL_BLOCK_RE.test(out)) {
-        out = out.replace(RTL_BLOCK_RE, ANCHOR);
-    }
+    out = stripRtlBlock(out);
     return out;
 }
 
@@ -270,8 +312,17 @@ export function installSidecarPlugin({ homeDir = os.homedir(), remove = false } 
     const destDir = getSidecarInstallDir(homeDir);
     if (remove) {
         if (fs.existsSync(destDir)) {
-            fs.rmSync(destDir, { recursive: true, force: true });
-            return { installed: false, removed: true, path: destDir };
+            try {
+                fs.rmSync(destDir, { recursive: true, force: true });
+                return { installed: false, removed: true, path: destDir };
+            } catch (err) {
+                return {
+                    installed: isSidecarPluginInstalled(homeDir),
+                    removed: false,
+                    path: destDir,
+                    warning: err && err.message ? err.message : String(err)
+                };
+            }
         }
         return { installed: false, removed: false, path: destDir };
     }
@@ -301,8 +352,48 @@ export function isSidecarPluginInstalled(homeDir = os.homedir()) {
     );
 }
 
+function readBundleAssets() {
+    const corePath = path.join(__dirname, 'context-core.cjs');
+    const runtimePath = path.join(__dirname, 'runtime-patch.js');
+    for (const reqPath of [corePath, runtimePath]) {
+        if (!fs.existsSync(reqPath)) {
+            throw new PatchError('MISSING_BUNDLE_ASSET', `Required asset missing: ${path.basename(reqPath)}`, {
+                causeText: `Expected file at ${reqPath} was deleted or incomplete.`,
+                fix: 'Re-clone or re-extract the complete antigravity-context-monitor package.'
+            });
+        }
+    }
+    return {
+        coreCode: fs.readFileSync(corePath, 'utf8'),
+        runtimeTemplate: fs.readFileSync(runtimePath, 'utf8')
+    };
+}
+
+export function computeExpectedPayloadHash() {
+    return buildStampedPayload().payloadHash;
+}
+
+function buildStampedPayload(assets = readBundleAssets()) {
+    const rendered = assets.runtimeTemplate.replace('__CONTEXT_CORE__', () => assets.coreCode).trimEnd();
+    const normalized = rendered.replace(/\r\n/g, '\n');
+    const payloadHash = crypto.createHash('sha256').update(normalized, 'utf8').digest('hex').slice(0, 16);
+    const hashComment = `/* AG_CTX_PAYLOAD_SHA256: ${payloadHash} */`;
+    let runtimeCode;
+    if (normalized.startsWith(PATCH_MARKER)) {
+        runtimeCode = PATCH_MARKER + '\n' + hashComment + normalized.slice(PATCH_MARKER.length);
+    } else {
+        runtimeCode = PATCH_MARKER + '\n' + hashComment + '\n' + normalized;
+    }
+    return { payloadHash, runtimeCode };
+}
+
 export function getPatchStatus(asarPath) {
     const checkedPaths = asarPath ? [asarPath] : getCandidateAppAsarPaths();
+    let expectedPayloadHash = null;
+    try {
+        expectedPayloadHash = computeExpectedPayloadHash();
+    } catch {}
+
     if (!asarPath || !fs.existsSync(asarPath)) {
         return {
             exists: false,
@@ -311,6 +402,7 @@ export function getPatchStatus(asarPath) {
             hasBackup: false,
             backupState: 'none',
             sidecarInstalled: isSidecarPluginInstalled(),
+            expectedPayloadHash,
             checkedPaths
         };
     }
@@ -324,24 +416,35 @@ export function getPatchStatus(asarPath) {
                 running: false,
                 hasBackup: false,
                 backupState: 'none',
-                sidecarInstalled: isSidecarPluginInstalled()
+                sidecarInstalled: isSidecarPluginInstalled(),
+                expectedPayloadHash
             };
         }
         const utils = readUtilsFromAsar(asarPath);
+        const installedPayloadHash = extractPayloadHash(utils);
         let state = 'unpatched';
         if (utils.includes(PATCH_MARKER)) {
-            state = 'patched';
+            if (expectedPayloadHash && installedPayloadHash === expectedPayloadHash) {
+                state = 'patched';
+            } else {
+                state = 'legacy_or_stale';
+            }
         } else if (hasAnyContextComment(utils)) {
             state = 'legacy_or_stale';
         }
+        const anchorMatch = findInjectionAnchor(utils);
         const backupInfo = inspectBackup(`${asarPath}.bak`);
         return {
             exists: true,
             asarPath,
             appVersion: readAppVersionFromAsar(asarPath),
             state,
+            payloadHash: installedPayloadHash,
+            expectedPayloadHash,
+            needsUpgrade: state === 'legacy_or_stale',
             rtlPresent: hasAnyRtlComment(utils),
-            hasAnchor: utils.includes(ANCHOR) || state !== 'unpatched',
+            hasAnchor: Boolean(anchorMatch) || state !== 'unpatched',
+            anchorMatch,
             hasBackup: backupInfo.exists,
             backupState: backupInfo.state,
             sidecarInstalled: isSidecarPluginInstalled(),
@@ -354,8 +457,12 @@ export function getPatchStatus(asarPath) {
             asarPath,
             state: 'corrupt',
             corruptReason: err.message,
+            payloadHash: null,
+            expectedPayloadHash,
+            needsUpgrade: false,
             rtlPresent: false,
             hasAnchor: false,
+            anchorMatch: null,
             hasBackup: backupInfo.exists,
             backupState: backupInfo.state,
             sidecarInstalled: isSidecarPluginInstalled(),
@@ -475,41 +582,30 @@ function rebuildAsarWithOverrides(srcAsarPath, destTmpPath, overrides, removals 
     }
 }
 
-function readBundleAssets() {
-    const corePath = path.join(__dirname, 'context-core.cjs');
-    const runtimePath = path.join(__dirname, 'runtime-patch.js');
-    for (const reqPath of [corePath, runtimePath]) {
-        if (!fs.existsSync(reqPath)) {
-            throw new PatchError('MISSING_BUNDLE_ASSET', `Required asset missing: ${path.basename(reqPath)}`, {
-                causeText: `Expected file at ${reqPath} was deleted or incomplete.`,
-                fix: 'Re-clone or re-extract the complete antigravity-context-monitor package.'
-            });
-        }
-    }
-    return {
-        coreCode: fs.readFileSync(corePath, 'utf8'),
-        runtimeTemplate: fs.readFileSync(runtimePath, 'utf8')
-    };
-}
-
 export function buildInjectedUtils(baseUtilsCode) {
-    if (!baseUtilsCode.includes(ANCHOR)) {
-        throw new PatchError('ANCHOR_NOT_FOUND', `Injection anchor "${ANCHOR}" not found in ${UTILS_REL_PATH}.`, {
-            causeText: 'This Antigravity release changed the internal startup hook inside dist/utils.js.',
-            fix: 'Your original app.asar was NOT modified. Check for an updated release.'
-        });
+    const anchor = findInjectionAnchor(baseUtilsCode);
+    if (!anchor) {
+        throw new PatchError(
+            'ANCHOR_NOT_FOUND',
+            `Injection anchor not found in ${UTILS_REL_PATH} (expected loadHubWindowUrl or win.loadURL startup call).`,
+            {
+                causeText: 'This Antigravity release changed the internal startup hook inside dist/utils.js.',
+                fix: 'Your original app.asar was NOT modified. Check for an updated release.'
+            }
+        );
     }
-    const { coreCode, runtimeTemplate } = readBundleAssets();
-    const runtimeCode = runtimeTemplate.replace('__CONTEXT_CORE__', () => coreCode).trimEnd();
+    const { runtimeCode } = buildStampedPayload();
+    const eol = baseUtilsCode.includes('\r\n') ? '\r\n' : '\n';
+    const runtimeWithEol = eol === '\r\n' ? runtimeCode.replace(/\n/g, '\r\n') : runtimeCode;
 
     let injected;
     const rtlMatch = RTL_START_RE.exec(baseUtilsCode);
     if (rtlMatch) {
         // Place Context Monitor right BEFORE the RTL block so both blocks remain strictly disjoint siblings.
         const idx = rtlMatch.index;
-        injected = baseUtilsCode.slice(0, idx) + runtimeCode + '\n' + baseUtilsCode.slice(idx);
+        injected = baseUtilsCode.slice(0, idx) + runtimeWithEol + eol + baseUtilsCode.slice(idx);
     } else {
-        injected = baseUtilsCode.replace(ANCHOR, () => runtimeCode + '\n' + ANCHOR);
+        injected = baseUtilsCode.replace(anchor, () => runtimeWithEol + eol + anchor);
     }
 
     try {
@@ -563,7 +659,14 @@ export function patchAsar(asarPath, { ifNeeded = false, syncSidecar = true, home
     }
     if (ifNeeded && status.state === 'patched') {
         const sidecar = syncSidecar ? installSidecarPlugin({ homeDir }) : null;
-        return { changed: false, status: 'already_patched', asarPath, appVersion: status.appVersion || null, sidecar };
+        return {
+            changed: false,
+            status: 'already_patched',
+            asarPath,
+            appVersion: status.appVersion || null,
+            payloadHash: status.payloadHash || null,
+            sidecar
+        };
     }
     if (status.running) {
         throw new PatchError('ANTIGRAVITY_RUNNING', 'Antigravity.exe is currently running and holding app.asar open.', {
@@ -595,7 +698,6 @@ export function patchAsar(asarPath, { ifNeeded = false, syncSidecar = true, home
     if (status.state === 'unpatched') {
         baseUtilsForInject = currentUtils;
         if (hasSiblingMod) {
-            // Sibling mod already modified app.asar; preserve clean same-version .bak if valid, else rebuild clean .bak
             const sameVersionClean = backupInfo.state === 'clean' && backupInfo.appVersion === status.appVersion;
             needBackupFromCleanBuild = !sameVersionClean;
         }
@@ -610,6 +712,8 @@ export function patchAsar(asarPath, { ifNeeded = false, syncSidecar = true, home
         needBackupFromCleanBuild = backupInfo.state !== 'clean';
     }
 
+    const matchedAnchor = findInjectionAnchor(baseUtilsForInject);
+    const expectedPayloadHash = computeExpectedPayloadHash();
     const injectedUtils = buildInjectedUtils(baseUtilsForInject);
 
     if (status.state === 'unpatched' && !hasSiblingMod) {
@@ -651,9 +755,9 @@ export function patchAsar(asarPath, { ifNeeded = false, syncSidecar = true, home
         asar.getRawHeader(tmpPath);
         const verifiedUtils = asar.extractFile(tmpPath, UTILS_REL_PATH).toString('utf8');
         new vm.Script(verifiedUtils, { filename: UTILS_REL_PATH });
-        if (!verifiedUtils.includes(PATCH_MARKER)) {
+        if (!verifiedUtils.includes(PATCH_MARKER) || extractPayloadHash(verifiedUtils) !== expectedPayloadHash) {
             throw new PatchError('POST_PACK_VERIFY_FAILED', 'Post-pack ASAR verification failed.', {
-                causeText: 'Extracted dist/utils.js in staged ASAR lacked expected marker.',
+                causeText: 'Extracted dist/utils.js in staged ASAR lacked expected marker or payload SHA-256.',
                 fix: 'Your original app.asar was NOT overwritten. Retry once.'
             });
         }
@@ -681,6 +785,9 @@ export function patchAsar(asarPath, { ifNeeded = false, syncSidecar = true, home
         return {
             changed: true,
             status: 'patched',
+            upgraded: status.state === 'legacy_or_stale',
+            payloadHash: expectedPayloadHash,
+            anchorMatch: matchedAnchor,
             asarPath,
             backupPath,
             appVersion: status.appVersion || null,
@@ -727,7 +834,7 @@ export function restoreAsar(asarPath, { strictBackup = false, removeSidecar = tr
         };
     }
 
-    // If RTL sibling mod is still active, strip ONLY Context Monitor and preserve clean .bak + RTL.
+    // If RTL sibling mod is still active, strip ONLY Context Monitor and preserve clean .bak + RTL + original anchor.
     if (hasSiblingRtl && (status.state === 'patched' || status.state === 'legacy_or_stale')) {
         const withoutCtx = stripOwnPatch(currentUtils);
         if (!withoutCtx) {
@@ -843,7 +950,7 @@ export function runDoctor(asarPath) {
 
     try {
         readBundleAssets();
-        checks.push({ id: 'bundle_assets', status: 'PASS', detail: 'context-core.cjs and runtime-patch.js present.' });
+        checks.push({ id: 'bundle_assets', status: 'PASS', detail: `context-core.cjs and runtime-patch.js present (payload sha256: ${computeExpectedPayloadHash()}).` });
     } catch (err) {
         checks.push({ id: 'bundle_assets', status: 'FAIL', detail: err.message, fix: err.fix });
     }
@@ -875,12 +982,14 @@ export function runDoctor(asarPath) {
         checks.push({
             id: 'asar_target',
             status: 'PASS',
-            detail: `Found Antigravity${st.appVersion ? ' v' + st.appVersion : ''} (${asarPath}) — state: ${st.state}${st.rtlPresent ? ' (coexisting with RTL)' : ''}`
+            detail: `Found Antigravity${st.appVersion ? ' v' + st.appVersion : ''} (${asarPath}) — state: ${st.state}${st.needsUpgrade ? ' (upgrade available)' : ''}${st.rtlPresent ? ' (coexisting with RTL)' : ''}`
         });
         checks.push({
             id: 'anchor_check',
             status: st.hasAnchor ? 'PASS' : 'FAIL',
-            detail: st.hasAnchor ? `Startup hook "${ANCHOR}" verified.` : `Missing expected hook "${ANCHOR}" in ${UTILS_REL_PATH}.`
+            detail: st.hasAnchor
+                ? `Startup hook "${st.anchorMatch || 'embedded'}" verified.`
+                : `Missing expected startup hook (loadHubWindowUrl / win.loadURL) in ${UTILS_REL_PATH}.`
         });
         checks.push({
             id: 'backup_health',
@@ -904,11 +1013,12 @@ export function runDoctor(asarPath) {
     };
 }
 
-function parseCliArgs(argv) {
+export function parseCliArgs(argv) {
     const cmd = argv[0] && !argv[0].startsWith('-') ? argv[0] : 'status';
     let customPath = null;
     let convId = null;
     let modelOverride = 'auto';
+    let modelOverrideExplicit = false;
 
     const pathIdx = argv.indexOf('--path');
     if (pathIdx !== -1) {
@@ -919,19 +1029,33 @@ function parseCliArgs(argv) {
         }
         customPath = argv[pathIdx + 1];
     }
+
     const convIdx = argv.indexOf('--conv');
-    if (convIdx !== -1 && argv[convIdx + 1]) {
+    if (convIdx !== -1) {
+        if (!argv[convIdx + 1] || argv[convIdx + 1].startsWith('-')) {
+            throw new PatchError('MISSING_CONV_VALUE', 'Flag `--conv` requires a conversation ID argument.', {
+                fix: 'Example: `node src/patcher.mjs analyze --conv "<conversation-uuid>" --json`'
+            });
+        }
         convId = argv[convIdx + 1];
     }
+
     const modelIdx = argv.indexOf('--model');
-    if (modelIdx !== -1 && argv[modelIdx + 1]) {
+    if (modelIdx !== -1) {
+        if (!argv[modelIdx + 1] || argv[modelIdx + 1].startsWith('-')) {
+            throw new PatchError('MISSING_MODEL_VALUE', 'Flag `--model` requires a model ID or display name argument.', {
+                fix: 'Example: `node src/patcher.mjs analyze --model "claude-sonnet-5-5-high" --json`'
+            });
+        }
         modelOverride = argv[modelIdx + 1];
+        modelOverrideExplicit = true;
     }
 
     return {
         cmd,
         convId,
         modelOverride,
+        modelOverrideExplicit,
         ifNeeded: argv.includes('--if-needed'),
         strictBackup: argv.includes('--strict-backup'),
         json: argv.includes('--json'),
@@ -967,16 +1091,30 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename
         } else if (opts.cmd === 'analyze') {
             const core = require('./context-core.cjs');
             const analyzer = core.createContextAnalyzer({ fs, path, os });
-            const recent = analyzer.listRecentConversations({ limit: 10 });
+            const settingsStore = core.createSettingsStore({ fs, path, os });
+            const cfg = settingsStore.readSettings();
+            const recent = analyzer.listRecentConversations({
+                limit: 10,
+                customModels: cfg.customModels,
+                compactWarnPct: cfg.compactWarnPct
+            });
             const targetId = opts.convId || (recent[0]?.conversationId || '');
+            const effectiveModel = opts.modelOverrideExplicit ? opts.modelOverride : cfg.modelOverride;
             result = {
                 targetConversationId: targetId,
-                analysis: targetId ? analyzer.analyzeConversationDir(targetId, { modelOverride: opts.modelOverride }) : null,
+                discoveredModels: analyzer.discoverModels({ customModels: cfg.customModels }),
+                analysis: targetId
+                    ? analyzer.analyzeConversationDir(targetId, {
+                        modelOverride: effectiveModel,
+                        compactWarnPct: cfg.compactWarnPct,
+                        customModels: cfg.customModels
+                    })
+                    : null,
                 recentConversations: recent
             };
         } else {
             throw new PatchError('INVALID_COMMAND', `Unknown command: ${opts.cmd}`, {
-                fix: 'Use one of: `status` | `doctor` | `patch [--if-needed]` | `restore [--strict-backup]` | `sync` | `analyze [--conv <id>]`'
+                fix: 'Use one of: `status` | `doctor` | `patch [--if-needed]` | `restore [--strict-backup]` | `sync` | `analyze [--conv <id>] [--model <id>]`'
             });
         }
 

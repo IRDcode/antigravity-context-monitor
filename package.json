@@ -1,8 +1,8 @@
 {
   "name": "antigravity-context-monitor",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
-  "description": "Real-time session context window monitor, per-category token breakdown, multi-model handoff guard, and Sidecar UI extension for Google Antigravity Desktop.",
+  "description": "Real-time session context window monitor, auto-compaction guard, 7-category token breakdown, 36+ model catalog with auto-discovery, and native Light/Dark Sidecar UI for Google Antigravity Desktop.",
   "keywords": [
     "antigravity",
     "google-antigravity",

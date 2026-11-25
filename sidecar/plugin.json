@@ -1,12 +1,12 @@
 {
   "name": "context-monitor",
   "displayName": "Context Monitor",
-  "version": "1.0.0",
-  "description": "Live session context window meter, 7-category token breakdown, prompt cache stats, and multi-model handoff guard.",
+  "version": "2.0.0",
+  "description": "Live session context window meter, auto-compaction guard, 7-category token breakdown, prompt cache stats, and multi-model handoff guard across 36+ models.",
   "logo": "assets/logo.svg",
   "suggestedPrompts": [
     "Analyze which files and tools are consuming the most context in this session",
-    "Check whether this session still fits inside Claude 5.5 (200k) or GPT-OSS (128k)",
-    "Generate a compact handoff summary before resetting or compacting context"
+    "Check whether this session is approaching auto-compaction or exceeds Claude 5.5 (200k) / GPT-OSS (128k)",
+    "Generate a compact handoff summary before switching between Gemini 4 Neon/Carbon/Hydrogen and Claude 5.5"
   ]
 }

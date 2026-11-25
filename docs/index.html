@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Antigravity Context Monitor — Real-Time Session Context Window &amp; Token Breakdown</title>
-  <meta name="description" content="Real-time session Context Window Monitor, 7-category token breakdown, prompt cache telemetry, isolated subagent tracking, and 128k/200k/1M model ceiling guard for Google Antigravity Desktop.">
-  <meta name="keywords" content="Antigravity Context Monitor, Google Antigravity context window, Antigravity token counter, Antigravity Claude Code context, Antigravity Orchestrator tokens, Antigravity Sidecar extension, Gemini 1M context monitor, Claude 200k context limit">
+  <title>Antigravity Context Monitor v2.0 — Real-Time Session Context Window &amp; Compaction Guard</title>
+  <meta name="description" content="Real-time session Context Window Monitor v2.0 for Google Antigravity Desktop: CHECKPOINT auto-compaction guard, 36+ models with auto-discovery, 7-category token breakdown, accessible combobox, and native Light/Dark Sidecar UI.">
+  <meta name="keywords" content="Antigravity Context Monitor, Google Antigravity context window, Antigravity v2.34.0, Antigravity compaction guard, Antigravity token counter, Gemini 4 Neon context monitor, Claude 5.5 200k context limit, Antigravity Sidecar extension">
   <link rel="canonical" href="https://irdcode.github.io/antigravity-context-monitor/">
   <link rel="alternate" hreflang="en" href="https://irdcode.github.io/antigravity-context-monitor/">
   <link rel="alternate" hreflang="x-default" href="https://irdcode.github.io/antigravity-context-monitor/">
 
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Antigravity Context Monitor — Live Context Window &amp; Token Telemetry">
-  <meta property="og:description" content="Offline, account-safe Context Window Monitor for Google Antigravity Desktop: exact PLANNER_RESPONSE token counts, 18 model ceilings (128k/200k/1M), 7-category breakdown, and Sidecar UI.">
+  <meta property="og:title" content="Antigravity Context Monitor v2.0 — Live Context Window &amp; Compaction Telemetry">
+  <meta property="og:description" content="Offline, account-safe Context Window Monitor v2.0 for Google Antigravity Desktop (v2.34.0): exact PLANNER_RESPONSE token counts, CHECKPOINT compaction guard, 36+ models + auto-discovery, Light/Dark sync, and Sidecar UI.">
   <meta property="og:url" content="https://irdcode.github.io/antigravity-context-monitor/">
   <meta name="twitter:card" content="summary">
   <meta name="theme-color" content="#050505">
@@ -26,11 +26,11 @@
         "name": "Antigravity Context Monitor",
         "operatingSystem": "Windows 10, Windows 11, macOS, Linux",
         "applicationCategory": "DeveloperApplication",
-        "softwareVersion": "1.0.0",
+        "softwareVersion": "2.0.0",
         "license": "https://github.com/IRDcode/antigravity-context-monitor/blob/main/LICENSE",
         "codeRepository": "https://github.com/IRDcode/antigravity-context-monitor",
         "url": "https://irdcode.github.io/antigravity-context-monitor/",
-        "description": "Real-time session Context Window Monitor, 7-category token breakdown, prompt cache telemetry, isolated subagent tracker, and multi-model handoff guard for Google Antigravity Desktop.",
+        "description": "Real-time session Context Window Monitor, CHECKPOINT auto-compaction guard, 7-category token breakdown, 36+ built-in models with auto-discovery, native Light/Dark sync, and Sidecar UI extension for Google Antigravity Desktop.",
         "offers": {
           "@type": "Offer",
           "price": "0",
@@ -45,15 +45,15 @@
             "name": "Why does Google Antigravity not show a Context Window bar by default?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Unlike single-loop CLI tools, Antigravity splits work across Planning and Execution phases in Orchestrator mode, isolates subagent sessions via invoke_subagent, and lazy-loads skills and MCP schemas. Antigravity still writes exact per-turn token counts to local session transcript.jsonl files, which Antigravity Context Monitor reads passively."
+              "text": "Unlike single-loop CLI tools, Antigravity splits work across Planning and Execution phases in Orchestrator mode, isolates subagent sessions via invoke_subagent, and lazy-loads skills and MCP schemas. Antigravity still writes exact per-turn token counts and compaction checkpoints to local session transcript.jsonl files, which Antigravity Context Monitor reads passively."
             }
           },
           {
             "@type": "Question",
-            "name": "How are tokens calculated and attributed across categories?",
+            "name": "How does v2.0 track auto-compaction and step rewinds without false positives?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Active session usage comes directly from the latest PLANNER_RESPONSE record: input_tokens + cache_read_tokens + output_tokens. The monitor reconciles 100% of that exact total across System & Rules, MCP Servers & Tools, Skills & Plugins, Files & Codebase, Terminal & Tasks, Chat Messages, and Reasoning & Subagents."
+              "text": "The analyzer distinguishes genuine Antigravity CHECKPOINT compaction records from Browser Session Checkpoints and tracks step_index rewind/retry branches separately. It exposes both Compacts (with pre-to-post history) and Rewinds counters, adapts to observed compaction thresholds (~500k on 1M models, 840k on claude-1m_840k, 85% on 200k/128k), and raises configurable Approaching Compact and Compacting Soon alerts."
             }
           },
           {
@@ -61,15 +61,15 @@
             "name": "Is Antigravity Context Monitor safe for my account?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Yes. It operates strictly read-only on local transcript.jsonl files, makes zero network calls, never modifies API headers, prompts, or auth tokens, and enforces a strict 127.0.0.1 origin guard on all Electron IPC handlers."
+              "text": "Yes. It operates strictly read-only on local transcript.jsonl files, makes zero network calls, never modifies API headers, prompts, or auth tokens, sanitizes ~/.antigravity-context-monitor.json, and enforces a strict 127.0.0.1 origin guard on all Electron IPC handlers."
             }
           },
           {
             "@type": "Question",
-            "name": "Does it support 128k, 200k, and 1M context ceilings accurately?",
+            "name": "Which models and Antigravity Desktop versions are supported?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Yes. All 18 official Antigravity models are mapped to their real context limits: 128k for GPT-OSS 120B, 200k for Claude Opus/Sonnet 5.5, and 1M for Gemini 3.8/4 and Orchestrator, with overflow alerts before handing a heavy session to a narrower model tier."
+              "text": "Verified on Google Antigravity Desktop v2.34.0 with backwards-compatible multi-anchor hooks for v2.32.x-v2.33.x. Includes 36 built-in models (GPT-OSS 120B/20B at 128k, Claude Opus/Sonnet 5.5 at 200k plus dynamic 1M/840k, Gemini 4 Neon/Carbon/Hydrogen/Argon, Gemini 3.x, and Orchestrator modes at 1M), automatic discovery of future models from transcripts and UI, and inline custom ceiling overrides."
             }
           }
         ]
@@ -294,57 +294,57 @@
     </nav>
 
     <header class="hero">
-      <div class="eyebrow">IRDCODE · GOOGLE ANTIGRAVITY CONTEXT TELEMETRY</div>
+      <div class="eyebrow">IRDCODE · GOOGLE ANTIGRAVITY CONTEXT TELEMETRY · V2.0.0</div>
       <h1>Real-Time Context Window Monitor for Google Antigravity Desktop</h1>
       <p class="lead">
-        Live session token meter, 7-category allocation breakdown, prompt cache hit-rate tracking, isolated subagent visibility, and cross-model overflow guard (<code>128k</code>, <code>200k</code>, <code>1M</code>) — powered strictly by passive local transcript reads.
+        Live session token meter, <code>CHECKPOINT</code> auto-compaction guard, 36+ built-in models with auto-discovery, 7-category allocation breakdown, accessible custom combobox, and native Light/Dark sync — powered strictly by passive local transcript reads.
       </p>
       <div class="cta-row">
-        <a class="btn btn-primary" href="https://github.com/IRDcode/antigravity-context-monitor/releases/latest">Download Latest Release</a>
+        <a class="btn btn-primary" href="https://github.com/IRDcode/antigravity-context-monitor/releases/latest">Download v2.0.0 Release</a>
         <a class="btn" href="https://github.com/IRDcode/antigravity-context-monitor">View Source on GitHub</a>
       </div>
     </header>
 
     <main>
       <section id="models" aria-labelledby="models-heading">
-        <h2 id="models-heading">Exact Model Ceilings &amp; Focus Sweet Spots</h2>
+        <h2 id="models-heading">36+ Built-In Models, Auto-Discovery &amp; Compaction Thresholds</h2>
         <div class="grid-3">
           <article class="card">
             <div class="tier-num">128k</div>
-            <h3>GPT-OSS 120B</h3>
-            <p><code>128,000</code> token ceiling with an <code>80k</code> reasoning focus budget. Triggers immediate overflow warnings on heavier sessions.</p>
+            <h3>GPT-OSS 120B &amp; 20B</h3>
+            <p><code>128,000</code> token ceiling, <code>108.8k</code> default auto-compact threshold, and <code>80k</code> focus budget with immediate overflow warnings.</p>
           </article>
           <article class="card">
             <div class="tier-num">200k</div>
             <h3>Claude Opus &amp; Sonnet 5.5</h3>
-            <p><code>200,000</code> token ceiling (High / Medium / Low) with a <code>120k</code> focus marker. Never misreported as a 1M window.</p>
+            <p><code>200,000</code> ceiling (Max / High / Medium / Low), <code>170k</code> auto-compact, <code>120k</code> focus marker, plus dynamic <code>1M</code> / <code>840k</code> variant handling.</p>
           </article>
           <article class="card">
             <div class="tier-num">1M</div>
-            <h3>Gemini 3.8 / 4 &amp; Orchestrator</h3>
-            <p><code>1,000,000</code> token ceiling with a <code>150k</code> focus marker plus <code>PLANNING ↔ EXECUTION</code> phase handoff tracking.</p>
+            <h3>Gemini 4 / 3.x &amp; Orchestrator</h3>
+            <p>Gemini 4 Neon, Carbon, Hydrogen, Argon, Gemini 3.x &amp; Orchestrator: <code>1M</code> ceiling, <code>~500k</code> auto-compact, <code>150k</code> focus, plus <code>PLANNING ↔ EXECUTION</code> tracking.</p>
           </article>
         </div>
       </section>
 
       <section id="features" aria-labelledby="features-heading">
-        <h2 id="features-heading">Architecture &amp; Account Safety</h2>
+        <h2 id="features-heading">v2.0 Architecture, UI &amp; Account Safety</h2>
         <div class="grid-2">
           <article class="card">
-            <h3>7-Category Allocation Breakdown</h3>
-            <p>Reconciles 100% of live <code>PLANNER_RESPONSE</code> tokens (<code>input_tokens + cache_read_tokens + output_tokens</code>) across System &amp; Rules, MCP Servers, Skills &amp; Plugins, Files, Terminal, Chat Messages, and Reasoning &amp; Subagents.</p>
+            <h3>CHECKPOINT Compaction Guard &amp; Rewinds</h3>
+            <p>Tracks genuine <code>CHECKPOINT</code> compactions (ignoring Browser Checkpoints), separates <code>step_index</code> retry <code>Rewinds</code>, adapts to observed compaction limits, and alerts at your configurable <code>30–95%</code> threshold.</p>
           </article>
           <article class="card">
-            <h3>Dual Native Surfaces</h3>
-            <p>Includes both a lightweight titlebar live pill + popover (<code>Alt+C</code>) and a full-height official Sidecar Auxiliary Pane plugin installed to <code>~/.gemini/config/plugins/context-monitor/</code>.</p>
+            <h3>Accessible Combobox &amp; Native Light/Dark Sync</h3>
+            <p>Unified UI kit shared by the <code>Alt+C</code> Titlebar drawer and official Sidecar pane: searchable ARIA combobox (zero OS <code>&lt;select&gt;</code> glitches), host Light/Dark luminance sync, and clean <code>empty_new</code> ready state.</p>
           </article>
           <article class="card">
-            <h3>Subagent &amp; Cache Telemetry</h3>
-            <p>Monitors prompt cache hit percentage, detects cache-miss resets, and tracks how many tokens child <code>invoke_subagent</code> sessions kept out of your parent context.</p>
+            <h3>7-Category Breakdown &amp; Subagent Isolation</h3>
+            <p>Reconciles 100% of live <code>PLANNER_RESPONSE</code> tokens across System, MCP, Skills, Files, Terminal, Chat, and Reasoning, while tracking prompt cache hit rate, misses, and child <code>invoke_subagent</code> offload.</p>
           </article>
           <article class="card">
-            <h3>100% Passive &amp; Account-Safe</h3>
-            <p>Zero network calls, zero auth/header hooks, strict <code>^https?://127\.0\.0\.1:\d+</code> origin lock, and clean SHA-256 <code>.bak</code> restore.</p>
+            <h3>100% Passive, v2.34.0 Multi-Anchor &amp; Account-Safe</h3>
+            <p>Zero network calls, strict <code>^https?://127\.0\.0\.1:\d+</code> origin lock, sanitized custom model settings, <code>SHA-256</code> auto-upgrade, and byte-identical <code>.bak</code> restore.</p>
           </article>
         </div>
         <pre>npm install --omit=dev
@@ -358,26 +358,26 @@ npm run restore                # Revert cleanly to stock Antigravity Desktop</pr
         <h2 id="faq-heading">Frequently Asked Questions</h2>
         <div class="faq-item">
           <h3>Why does Google Antigravity not show a Context Window bar by default?</h3>
-          <p>Unlike single-loop CLI tools, Antigravity splits work across Planning and Execution phases in Orchestrator mode, isolates subagent sessions via <code>invoke_subagent</code>, and lazy-loads skills and MCP schemas. Antigravity still writes exact per-turn token counts to local session <code>transcript.jsonl</code> files, which Antigravity Context Monitor reads passively.</p>
+          <p>Unlike single-loop CLI tools, Antigravity splits work across Planning and Execution phases in Orchestrator mode, isolates subagent sessions via <code>invoke_subagent</code>, and lazy-loads skills and MCP schemas. Antigravity still writes exact per-turn token counts and compaction checkpoints to local session <code>transcript.jsonl</code> files, which Antigravity Context Monitor reads passively.</p>
         </div>
         <div class="faq-item">
-          <h3>How are tokens calculated and attributed across categories?</h3>
-          <p>Active session usage comes directly from the latest <code>PLANNER_RESPONSE</code> record: <code>input_tokens + cache_read_tokens + output_tokens</code>. The monitor reconciles 100% of that exact total across System &amp; Rules, MCP Servers &amp; Tools, Skills &amp; Plugins, Files &amp; Codebase, Terminal &amp; Tasks, Chat Messages, and Reasoning &amp; Subagents.</p>
+          <h3>How does v2.0 track auto-compaction and step rewinds without false positives?</h3>
+          <p>The analyzer distinguishes genuine Antigravity <code>CHECKPOINT</code> compaction records from Browser Session Checkpoints and rolls back <code>step_index</code> rewind/retry branches cleanly. It exposes both <code>Compacts</code> (with pre→post history) and <code>Rewinds</code> counters, adapts to observed compaction peaks (<code>~500k</code> on <code>1M</code>, <code>840k</code> on <code>claude-1m_840k</code>, <code>85%</code> on <code>200k</code>/<code>128k</code>), and fires configurable compaction warnings.</p>
         </div>
         <div class="faq-item">
           <h3>Is Antigravity Context Monitor safe for my account?</h3>
-          <p>Yes. It operates strictly read-only on local <code>transcript.jsonl</code> files, makes zero network calls, never modifies API headers, prompts, or auth tokens, and enforces a strict <code>127.0.0.1</code> origin guard on all Electron IPC handlers.</p>
+          <p>Yes. It operates strictly read-only on local <code>transcript.jsonl</code> files, makes zero network calls, never modifies API headers, prompts, or auth tokens, sanitizes <code>~/.antigravity-context-monitor.json</code>, and enforces a strict <code>127.0.0.1</code> origin guard on all Electron IPC handlers.</p>
         </div>
         <div class="faq-item">
-          <h3>Does it support 128k, 200k, and 1M context ceilings accurately?</h3>
-          <p>Yes. All 18 official Antigravity models are mapped to their real context limits: <code>128k</code> for GPT-OSS 120B, <code>200k</code> for Claude Opus/Sonnet 5.5, and <code>1M</code> for Gemini 3.8/4 and Orchestrator, with overflow alerts before handing a heavy session to a narrower model tier.</p>
+          <h3>Which models and Antigravity Desktop versions are supported?</h3>
+          <p>Verified on Google Antigravity Desktop <code>v2.34.0</code> with backwards-compatible multi-anchor hooks for <code>v2.32.x</code>–<code>v2.33.x</code>. Includes <code>36</code> built-in models across GPT-OSS (<code>128k</code>), Claude 5.5 (<code>200k</code> + dynamic <code>1M</code>/<code>840k</code>), Gemini 4 Neon/Carbon/Hydrogen/Argon, Gemini 3.x, and Orchestrator (<code>1M</code>), plus automatic discovery of future models and inline custom ceiling overrides.</p>
         </div>
       </section>
     </main>
 
     <footer>
       <span>MIT License · Built by <a href="https://github.com/IRDcode">IRDcode</a></span>
-      <span>Verified on Google Antigravity Desktop v2.32.1</span>
+      <span>v2.0.0 · Verified on Google Antigravity Desktop v2.34.0</span>
     </footer>
   </div>
 </body>

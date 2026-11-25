@@ -11,6 +11,17 @@ export const {
     MODEL_CATALOG,
     MODEL_TIERS,
     CATEGORY_META,
+    BASE_CONFIG,
+    SAFE_MODEL_RE,
+    SAFE_CONV_RE,
+    isSafeModelId,
+    isSafeConvId,
+    sanitizeCustomModels,
+    sanitizeSettings,
+    createSettingsStore,
+    formatTokens,
+    formatFullTokens,
+    buildCompactSummary,
     resolveModelProfile,
     estimateTokens,
     classifyToolName,
@@ -21,6 +32,9 @@ export const {
 export const {
     analyzeConversationDir,
     listRecentConversations,
+    detectLatestGlobalModel,
+    discoverModels,
+    resolveContextPayload,
     findBrainDir,
     createContextAnalyzer
 } = { ...defaultAnalyzer, createContextAnalyzer: core.createContextAnalyzer };

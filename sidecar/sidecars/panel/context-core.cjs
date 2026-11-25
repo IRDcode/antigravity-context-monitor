@@ -8,38 +8,83 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
     'use strict';
 
+    const RULES_TOKEN_BUDGET = 20000;
+    const CUSTOMIZATION_TOKEN_BUDGET = 20000;
+    const PREAMBLE_BASE_CAP = RULES_TOKEN_BUDGET + CUSTOMIZATION_TOKEN_BUDGET; // 40,000
+
+    function defaultCompactionLimit(contextLimit) {
+        const limit = Number(contextLimit) || 1000000;
+        if (limit >= 1000000) return 500000;
+        return Math.round(limit * 0.85);
+    }
+
+    function formatTierLabel(contextLimit) {
+        const limit = Number(contextLimit) || 1000000;
+        if (limit >= 1000000) {
+            const m = limit / 1000000;
+            return (Number.isInteger(m) ? String(m) : m.toFixed(1)) + 'M';
+        }
+        return Math.round(limit / 1000) + 'k';
+    }
+
     const MODEL_CATALOG = [
-        // Claude 5.5 (200k Context Window)
-        { id: 'claude-opus-5-5-high', displayName: 'Claude Opus 5.5 (High)', family: 'claude', contextLimit: 200000, attentionThreshold: 120000, tierLabel: '200k', isDualPhase: false },
-        { id: 'claude-opus-5-5-medium', displayName: 'Claude Opus 5.5 (Medium)', family: 'claude', contextLimit: 200000, attentionThreshold: 120000, tierLabel: '200k', isDualPhase: false },
-        { id: 'claude-opus-5-5-low', displayName: 'Claude Opus 5.5 (Low)', family: 'claude', contextLimit: 200000, attentionThreshold: 120000, tierLabel: '200k', isDualPhase: false },
-        { id: 'claude-sonnet-5-5-high', displayName: 'Claude Sonnet 5.5 (High)', family: 'claude', contextLimit: 200000, attentionThreshold: 120000, tierLabel: '200k', isDualPhase: false },
-        { id: 'claude-sonnet-5-5-medium', displayName: 'Claude Sonnet 5.5 (Medium)', family: 'claude', contextLimit: 200000, attentionThreshold: 120000, tierLabel: '200k', isDualPhase: false },
-        { id: 'claude-sonnet-5-5-low', displayName: 'Claude Sonnet 5.5 (Low)', family: 'claude', contextLimit: 200000, attentionThreshold: 120000, tierLabel: '200k', isDualPhase: false },
+        // Claude 5.5 (200k Context Window; 1M/840k variants inferred dynamically)
+        { id: 'claude-opus-5-5-max', displayName: 'Claude Opus 5.5 (Max)', family: 'claude', contextLimit: 200000, compactionLimit: 170000, attentionThreshold: 120000, tierLabel: '200k', isDualPhase: false },
+        { id: 'claude-opus-5-5-high', displayName: 'Claude Opus 5.5 (High)', family: 'claude', contextLimit: 200000, compactionLimit: 170000, attentionThreshold: 120000, tierLabel: '200k', isDualPhase: false },
+        { id: 'claude-opus-5-5-medium', displayName: 'Claude Opus 5.5 (Medium)', family: 'claude', contextLimit: 200000, compactionLimit: 170000, attentionThreshold: 120000, tierLabel: '200k', isDualPhase: false },
+        { id: 'claude-opus-5-5-low', displayName: 'Claude Opus 5.5 (Low)', family: 'claude', contextLimit: 200000, compactionLimit: 170000, attentionThreshold: 120000, tierLabel: '200k', isDualPhase: false },
+        { id: 'claude-sonnet-5-5-max', displayName: 'Claude Sonnet 5.5 (Max)', family: 'claude', contextLimit: 200000, compactionLimit: 170000, attentionThreshold: 120000, tierLabel: '200k', isDualPhase: false },
+        { id: 'claude-sonnet-5-5-high', displayName: 'Claude Sonnet 5.5 (High)', family: 'claude', contextLimit: 200000, compactionLimit: 170000, attentionThreshold: 120000, tierLabel: '200k', isDualPhase: false },
+        { id: 'claude-sonnet-5-5-medium', displayName: 'Claude Sonnet 5.5 (Medium)', family: 'claude', contextLimit: 200000, compactionLimit: 170000, attentionThreshold: 120000, tierLabel: '200k', isDualPhase: false },
+        { id: 'claude-sonnet-5-5-low', displayName: 'Claude Sonnet 5.5 (Low)', family: 'claude', contextLimit: 200000, compactionLimit: 170000, attentionThreshold: 120000, tierLabel: '200k', isDualPhase: false },
 
         // GPT-OSS (128k Context Window)
-        { id: 'gpt-oss-120b-medium', displayName: 'GPT-OSS 120B (Medium)', family: 'gpt-oss', contextLimit: 128000, attentionThreshold: 80000, tierLabel: '128k', isDualPhase: false },
+        { id: 'gpt-oss-120b-medium', displayName: 'GPT-OSS 120B (Medium)', family: 'gpt-oss', contextLimit: 128000, compactionLimit: 108800, attentionThreshold: 80000, tierLabel: '128k', isDualPhase: false },
+        { id: 'gpt-oss-20b', displayName: 'GPT-OSS 20B', family: 'gpt-oss', contextLimit: 128000, compactionLimit: 108800, attentionThreshold: 80000, tierLabel: '128k', isDualPhase: false },
 
-        // Gemini 3.8 & Gemini 4 (1M Context Window)
-        { id: 'gemini-3.8-flash-high', displayName: 'Gemini 3.8 Flash (High)', family: 'gemini', contextLimit: 1000000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
-        { id: 'gemini-3.8-flash-medium', displayName: 'Gemini 3.8 Flash (Medium)', family: 'gemini', contextLimit: 1000000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
-        { id: 'gemini-3.8-flash-low', displayName: 'Gemini 3.8 Flash (Low)', family: 'gemini', contextLimit: 1000000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
-        { id: 'gemini-4-argon-high', displayName: 'Gemini 4 Argon (High)', family: 'gemini', contextLimit: 1000000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
-        { id: 'gemini-4-argon-medium', displayName: 'Gemini 4 Argon (Medium)', family: 'gemini', contextLimit: 1000000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
-        { id: 'gemini-4-argon-low', displayName: 'Gemini 4 Argon (Low)', family: 'gemini', contextLimit: 1000000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
-        { id: 'gemini-4-hydrogen-xhigh', displayName: 'Gemini 4 Hydrogen (XHigh)', family: 'gemini', contextLimit: 1000000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
-        { id: 'gemini-4-hydrogen-high', displayName: 'Gemini 4 Hydrogen (High)', family: 'gemini', contextLimit: 1000000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
-        { id: 'gemini-4-hydrogen-medium', displayName: 'Gemini 4 Hydrogen (Medium)', family: 'gemini', contextLimit: 1000000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
-        { id: 'gemini-4-hydrogen-low', displayName: 'Gemini 4 Hydrogen (Low)', family: 'gemini', contextLimit: 1000000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+        // Gemini 4 Neon (1M Context Window, ~500k auto-compaction)
+        { id: 'gemini-4-neon-xhigh', displayName: 'Gemini 4 Neon (XHigh)', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+        { id: 'gemini-4-neon-high', displayName: 'Gemini 4 Neon (High)', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+        { id: 'gemini-4-neon-medium', displayName: 'Gemini 4 Neon (Medium)', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+        { id: 'gemini-4-neon-low', displayName: 'Gemini 4 Neon (Low)', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+
+        // Gemini 4 Carbon (1M Context Window)
+        { id: 'gemini-4-carbon-high', displayName: 'Gemini 4 Carbon (High)', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+        { id: 'gemini-4-carbon-medium', displayName: 'Gemini 4 Carbon (Medium)', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+        { id: 'gemini-4-carbon-low', displayName: 'Gemini 4 Carbon (Low)', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+
+        // Gemini 4 Hydrogen (1M Context Window)
+        { id: 'gemini-4-hydrogen-xhigh', displayName: 'Gemini 4 Hydrogen (XHigh)', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+        { id: 'gemini-4-hydrogen-high', displayName: 'Gemini 4 Hydrogen (High)', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+        { id: 'gemini-4-hydrogen-medium', displayName: 'Gemini 4 Hydrogen (Medium)', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+        { id: 'gemini-4-hydrogen-low', displayName: 'Gemini 4 Hydrogen (Low)', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+
+        // Gemini 4 Argon (1M Context Window)
+        { id: 'gemini-4-argon-high', displayName: 'Gemini 4 Argon (High)', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+        { id: 'gemini-4-argon-medium', displayName: 'Gemini 4 Argon (Medium)', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+        { id: 'gemini-4-argon-low', displayName: 'Gemini 4 Argon (Low)', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+
+        // Gemini 3.x (1M Context Window)
+        { id: 'gemini-3.8-flash-high', displayName: 'Gemini 3.8 Flash (High)', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+        { id: 'gemini-3.8-flash-medium', displayName: 'Gemini 3.8 Flash (Medium)', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+        { id: 'gemini-3.8-flash-low', displayName: 'Gemini 3.8 Flash (Low)', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+        { id: 'gemini-3.7-flash-high', displayName: 'Gemini 3.7 Flash (High)', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+        { id: 'gemini-3.6-flash', displayName: 'Gemini 3.6 Flash', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+        { id: 'gemini-3.5-flash', displayName: 'Gemini 3.5 Flash', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+        { id: 'gemini-3.1-pro-high', displayName: 'Gemini 3.1 Pro (High)', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+        { id: 'gemini-3.1-pro-low', displayName: 'Gemini 3.1 Pro (Low)', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
+        { id: 'gemini-3.1-flash-lite', displayName: 'Gemini 3.1 Flash Lite', family: 'gemini', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: false },
 
         // Orchestrator Dual-Phase Mode (1M Context Window, Plan/Execute split)
-        { id: 'gemini-pro-orchestrator-g1-pro', displayName: 'Orchestrator (Argon)', family: 'orchestrator', contextLimit: 1000000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: true }
+        { id: 'orchestrator-gemini-4-neon-xhigh', displayName: 'Orchestrator · Gemini 4 Neon Extra High', family: 'orchestrator', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: true },
+        { id: 'gemini-4-hydrogen-orchestrator', displayName: 'Gemini 4 Hydrogen (Orchestrator)', family: 'orchestrator', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: true },
+        { id: 'gemini-pro-orchestrator-g1-pro', displayName: 'Orchestrator (Argon)', family: 'orchestrator', contextLimit: 1000000, compactionLimit: 500000, attentionThreshold: 150000, tierLabel: '1M', isDualPhase: true }
     ];
 
     const MODEL_TIERS = [
-        { key: 'gpt-oss', label: 'GPT-OSS 120B', ceiling: 128000, tierLabel: '128k' },
-        { key: 'claude', label: 'Claude 5.5', ceiling: 200000, tierLabel: '200k' },
-        { key: 'gemini', label: 'Gemini / Orchestrator', ceiling: 1000000, tierLabel: '1M' }
+        { key: 'gpt-oss', label: 'GPT-OSS 120B', shortLabel: 'GPT-OSS', ceiling: 128000, tierLabel: '128k' },
+        { key: 'claude', label: 'Claude 5.5', shortLabel: 'Claude', ceiling: 200000, tierLabel: '200k' },
+        { key: 'gemini', label: 'Gemini / Orchestrator', shortLabel: 'Gemini', ceiling: 1000000, tierLabel: '1M' }
     ];
 
     const CATEGORY_META = [
@@ -51,6 +96,20 @@
         { key: 'messages', label: 'Chat Messages', shortLabel: 'Messages', tone: '#fafafa' },
         { key: 'reasoning_subagents', label: 'Reasoning & Subagents', shortLabel: 'Reasoning', tone: '#3f3f46' }
     ];
+
+    const SAFE_MODEL_RE = /^[A-Za-z0-9 ._\u00B7()/-]{1,96}$/;
+    const SAFE_CONV_RE = /^(?:auto|[A-Za-z0-9._-]{8,80})$/;
+    const SAFE_ID_RE = /^[A-Za-z0-9._-]+$/;
+    const ALLOWED_FAMILIES = new Set(['claude', 'gemini', 'gpt-oss', 'orchestrator', 'custom']);
+    const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype', 'auto', 'none']);
+
+    const BASE_CONFIG = {
+        modelOverride: 'auto',
+        selectedConvId: 'auto',
+        compactWarnPct: 70,
+        showInTitlebar: true,
+        customModels: {}
+    };
 
     const FILE_TOOLS = new Set([
         'read_file', 'edit_file', 'write_file', 'grep_search', 'find_by_name',
@@ -73,7 +132,179 @@
     const USER_REQ_RE = /<USER_REQUEST>\s*([\s\S]*?)\s*<\/USER_REQUEST>/;
     const TRUNCATED_BYTES_RE = /<truncated (\d+) bytes>/g;
     const SUBAGENT_CONV_RE = /"conversationId"\s*:\s*"([0-9a-f-]{8,})"/gi;
-    const SAFE_ID_RE = /^[A-Za-z0-9._-]+$/;
+    const DOM_MODEL_NAME_RE = /^(?:Gemini\s+\d|Claude\s+(?:Opus|Sonnet|Haiku)|GPT[- ]?OSS|Orchestrator\b)/i;
+
+    function isSafeModelId(value) {
+        if (typeof value !== 'string') return false;
+        const trimmed = value.trim();
+        return trimmed === 'auto' || (trimmed.length > 0 && SAFE_MODEL_RE.test(trimmed));
+    }
+
+    function isSafeConvId(value) {
+        if (typeof value !== 'string') return false;
+        const trimmed = value.trim();
+        return SAFE_CONV_RE.test(trimmed) && !trimmed.includes('..');
+    }
+
+    function sanitizeCustomModels(rawMap) {
+        const out = {};
+        if (!rawMap || typeof rawMap !== 'object' || Array.isArray(rawMap)) return out;
+        let count = 0;
+        for (const [rawKey, rawVal] of Object.entries(rawMap)) {
+            if (count >= 50) break;
+            if (typeof rawKey !== 'string') continue;
+            const key = rawKey.trim();
+            if (!key || FORBIDDEN_KEYS.has(key.toLowerCase()) || !SAFE_MODEL_RE.test(key)) continue;
+            if (!rawVal || typeof rawVal !== 'object' || Array.isArray(rawVal)) continue;
+
+            const entry = {};
+            if (rawVal.contextLimit !== undefined) {
+                const n = Number(rawVal.contextLimit);
+                if (Number.isInteger(n) && n >= 8000 && n <= 10000000) {
+                    entry.contextLimit = n;
+                }
+            }
+            if (rawVal.compactionLimit !== undefined) {
+                const n = Number(rawVal.compactionLimit);
+                if (Number.isInteger(n) && n >= 4000 && n <= 10000000) {
+                    entry.compactionLimit = entry.contextLimit ? Math.min(n, entry.contextLimit) : n;
+                }
+            }
+            if (rawVal.attentionThreshold !== undefined) {
+                const n = Number(rawVal.attentionThreshold);
+                if (Number.isInteger(n) && n >= 4000 && n <= 10000000) {
+                    entry.attentionThreshold = entry.contextLimit ? Math.min(n, entry.contextLimit) : n;
+                }
+            }
+            if (typeof rawVal.isDualPhase === 'boolean') {
+                entry.isDualPhase = rawVal.isDualPhase;
+            }
+            if (typeof rawVal.displayName === 'string' && SAFE_MODEL_RE.test(rawVal.displayName.trim())) {
+                entry.displayName = rawVal.displayName.trim();
+            }
+            if (typeof rawVal.family === 'string' && ALLOWED_FAMILIES.has(rawVal.family.trim().toLowerCase())) {
+                entry.family = rawVal.family.trim().toLowerCase();
+            }
+
+            if (Object.keys(entry).length > 0) {
+                out[key] = entry;
+                count++;
+            }
+        }
+        return out;
+    }
+
+    function sanitizeSettings(raw) {
+        const clean = {};
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return clean;
+        if (typeof raw.modelOverride === 'string' && isSafeModelId(raw.modelOverride)) {
+            clean.modelOverride = raw.modelOverride.trim();
+        }
+        if (typeof raw.selectedConvId === 'string' && isSafeConvId(raw.selectedConvId)) {
+            clean.selectedConvId = raw.selectedConvId.trim();
+        }
+        if (raw.compactWarnPct !== undefined) {
+            const n = Number(raw.compactWarnPct);
+            if (Number.isInteger(n) && n >= 30 && n <= 95) {
+                clean.compactWarnPct = n;
+            }
+        }
+        if (typeof raw.showInTitlebar === 'boolean') {
+            clean.showInTitlebar = raw.showInTitlebar;
+        }
+        if (raw.customModels !== undefined && raw.customModels !== null && typeof raw.customModels === 'object' && !Array.isArray(raw.customModels)) {
+            clean.customModels = sanitizeCustomModels(raw.customModels);
+        }
+        return clean;
+    }
+
+    function createSettingsStore(deps = {}) {
+        const fs = deps.fs || require('node:fs');
+        const path = deps.path || require('node:path');
+        const os = deps.os || require('node:os');
+
+        function settingsFilePath() {
+            if (deps.settingsPath) return deps.settingsPath;
+            return path.join(os.homedir(), '.antigravity-context-monitor.json');
+        }
+
+        function readSettings() {
+            let merged = { ...BASE_CONFIG, customModels: {} };
+            try {
+                const file = settingsFilePath();
+                if (fs.existsSync(file)) {
+                    const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+                    const clean = sanitizeSettings(parsed);
+                    merged = {
+                        ...merged,
+                        ...clean,
+                        customModels: clean.customModels ? { ...clean.customModels } : {}
+                    };
+                }
+            } catch (_) {}
+            return merged;
+        }
+
+        function writeSettingsPatch(patch) {
+            try {
+                const cleanPatch = sanitizeSettings(patch);
+                const file = settingsFilePath();
+                let current = {};
+                if (fs.existsSync(file)) {
+                    try {
+                        current = sanitizeSettings(JSON.parse(fs.readFileSync(file, 'utf8')));
+                    } catch (_) {}
+                }
+                const next = {
+                    ...BASE_CONFIG,
+                    ...current,
+                    ...cleanPatch,
+                    customModels: cleanPatch.customModels !== undefined
+                        ? { ...cleanPatch.customModels }
+                        : (current.customModels ? { ...current.customModels } : {})
+                };
+                fs.writeFileSync(file, JSON.stringify(next, null, 2), 'utf8');
+                return next;
+            } catch (_) {
+                return readSettings();
+            }
+        }
+
+        return {
+            settingsFilePath,
+            readSettings,
+            writeSettingsPatch
+        };
+    }
+
+    function formatTokens(n) {
+        const v = Number(n) || 0;
+        if (v >= 1000000) return (v / 1000000).toFixed(2) + 'M';
+        if (v >= 10000) return (v / 1000).toFixed(0) + 'k';
+        if (v >= 1000) return (v / 1000).toFixed(1) + 'k';
+        return String(Math.round(v));
+    }
+
+    function formatFullTokens(n) {
+        return (Number(n) || 0).toLocaleString('en-US');
+    }
+
+    function buildCompactSummary(a) {
+        if (!a || !a.activeModel) return '';
+        const compLine = `Compaction: ${formatFullTokens(a.activeTokens)} / ${formatFullTokens(a.compactionLimit || a.activeModel.compactionLimit)} (${a.compactionPct ?? 0}%, ${a.compactionEvents || 0} events, warning: ${a.compactionWarning || 'NONE'})`;
+        const catBreakdown = Array.isArray(a.categories)
+            ? a.categories.map((c) => `${c.shortLabel}=${formatTokens(c.tokens)} (${c.pct}%)`).join(', ')
+            : '';
+        const subCount = Array.isArray(a.subagents) ? a.subagents.length : 0;
+        return [
+            `[Context Window Snapshot — ${a.activeModel.displayName} (${a.activeModel.tierLabel})]`,
+            `Session: ${a.conversationId || 'unknown'} | Phase: ${a.phase || 'SINGLE'} | Usage: ${formatFullTokens(a.activeTokens)} / ${formatFullTokens(a.activeModel.contextLimit)} (${a.usedPct}%)`,
+            compLine,
+            `Cache: ${a.cacheHitRatePct}% hit (${formatFullTokens(a.cacheReadTokens)} cached, ${formatFullTokens(a.inputTokens)} fresh, ${a.cacheMissCount} misses)`,
+            `Breakdown: ${catBreakdown}`,
+            `Offloaded Subagents: ${subCount} (${formatTokens(a.offloadedTokens || 0)} tok)`
+        ].join('\n');
+    }
 
     function extractModelChangesFromUserInput(content) {
         if (!content || typeof content !== 'string' || !content.includes('<USER_SETTINGS_CHANGE>')) {
@@ -98,15 +329,70 @@
         return String(raw || '').trim().toLowerCase();
     }
 
-    function resolveModelProfile(input) {
+    function canonicalLookupKey(raw) {
+        return normalizeModelKey(raw)
+            .replace(/[\u00B7•|]+/g, ' ')
+            .replace(/\bextra[\s-]+high\b/g, 'xhigh')
+            .replace(/[()]/g, ' ')
+            .replace(/[\s_-]+/g, ' ')
+            .trim();
+    }
+
+    function findCustomOverride(customModels, candidates) {
+        if (!customModels || typeof customModels !== 'object') return null;
+        const clean = sanitizeCustomModels(customModels);
+        const entries = Object.entries(clean);
+        if (entries.length === 0) return null;
+        const candidateKeys = new Set();
+        for (const c of candidates) {
+            if (!c) continue;
+            candidateKeys.add(normalizeModelKey(c));
+            candidateKeys.add(canonicalLookupKey(c));
+        }
+        for (const [k, v] of entries) {
+            if (candidateKeys.has(normalizeModelKey(k)) || candidateKeys.has(canonicalLookupKey(k))) {
+                return { key: k, spec: v };
+            }
+        }
+        return null;
+    }
+
+    function applyCustomOverride(baseProfile, customMatch) {
+        if (!customMatch || !customMatch.spec) return baseProfile;
+        const s = customMatch.spec;
+        const contextLimit = s.contextLimit || baseProfile.contextLimit;
+        const compactionLimit = s.compactionLimit
+            ? Math.min(s.compactionLimit, contextLimit)
+            : (s.contextLimit ? defaultCompactionLimit(contextLimit) : baseProfile.compactionLimit);
+        const attentionThreshold = s.attentionThreshold
+            ? Math.min(s.attentionThreshold, contextLimit)
+            : Math.min(baseProfile.attentionThreshold, contextLimit);
+        const isDualPhase = typeof s.isDualPhase === 'boolean' ? s.isDualPhase : baseProfile.isDualPhase;
+        const family = s.family || (isDualPhase ? 'orchestrator' : baseProfile.family);
+        return {
+            ...baseProfile,
+            displayName: s.displayName || baseProfile.displayName,
+            family,
+            contextLimit,
+            compactionLimit,
+            attentionThreshold,
+            tierLabel: formatTierLabel(contextLimit),
+            isDualPhase,
+            inferred: false,
+            customCompactionLimit: s.compactionLimit ? compactionLimit : undefined
+        };
+    }
+
+    function resolveModelProfile(input, customModels = null) {
         const raw = String(input || '').trim();
         const key = normalizeModelKey(raw);
         if (!key || key === 'auto' || key === 'none') {
             return {
-                id: 'gemini-4-hydrogen-xhigh',
+                id: 'gemini-4-neon-xhigh',
                 displayName: 'Auto (Gemini 1M)',
                 family: 'gemini',
                 contextLimit: 1000000,
+                compactionLimit: 500000,
                 attentionThreshold: 150000,
                 tierLabel: '1M',
                 isDualPhase: false,
@@ -114,72 +400,103 @@
             };
         }
 
+        const canon = canonicalLookupKey(raw);
         const exact = MODEL_CATALOG.find(
-            (m) => m.id.toLowerCase() === key || m.displayName.toLowerCase() === key
+            (m) =>
+                m.id.toLowerCase() === key ||
+                m.displayName.toLowerCase() === key ||
+                canonicalLookupKey(m.id) === canon ||
+                canonicalLookupKey(m.displayName) === canon
         );
         if (exact) {
-            return { ...exact, inferred: false };
+            const base = { ...exact, inferred: false };
+            const override = findCustomOverride(customModels, [raw, exact.id, exact.displayName]);
+            return applyCustomOverride(base, override);
         }
 
-        if (key.includes('orchestrator')) {
-            return {
+        const isDualPhase = key.includes('orchestrator');
+        const has1mOr840k = /(?:^|[^a-z0-9])1m(?:[^a-z0-9]|$)|840k/i.test(key);
+        let profile;
+
+        if (key.includes('claude')) {
+            if (has1mOr840k) {
+                const compLim = key.includes('840k') ? 840000 : 500000;
+                profile = {
+                    id: raw,
+                    displayName: raw,
+                    family: isDualPhase ? 'orchestrator' : 'claude',
+                    contextLimit: 1000000,
+                    compactionLimit: compLim,
+                    attentionThreshold: 150000,
+                    tierLabel: '1M',
+                    isDualPhase,
+                    inferred: false
+                };
+            } else {
+                profile = {
+                    id: raw,
+                    displayName: raw,
+                    family: isDualPhase ? 'orchestrator' : 'claude',
+                    contextLimit: 200000,
+                    compactionLimit: 170000,
+                    attentionThreshold: 120000,
+                    tierLabel: '200k',
+                    isDualPhase,
+                    inferred: false
+                };
+            }
+        } else if (isDualPhase) {
+            profile = {
                 id: raw,
                 displayName: raw,
                 family: 'orchestrator',
                 contextLimit: 1000000,
+                compactionLimit: 500000,
                 attentionThreshold: 150000,
                 tierLabel: '1M',
                 isDualPhase: true,
                 inferred: false
             };
-        }
-        if (key.includes('claude')) {
-            return {
-                id: raw,
-                displayName: raw,
-                family: 'claude',
-                contextLimit: 200000,
-                attentionThreshold: 120000,
-                tierLabel: '200k',
-                isDualPhase: false,
-                inferred: false
-            };
-        }
-        if (key.includes('gpt-oss') || key.includes('gpt_oss') || /\bgpt-?(?:4|5|oss)\b/i.test(key) || /\bo[134]\b/i.test(key)) {
-            return {
+        } else if (key.includes('gpt-oss') || key.includes('gpt_oss') || /\bgpt-?(?:4|5|oss)\b/i.test(key) || /\bo[134]\b/i.test(key)) {
+            profile = {
                 id: raw,
                 displayName: raw,
                 family: 'gpt-oss',
                 contextLimit: 128000,
+                compactionLimit: 108800,
                 attentionThreshold: 80000,
                 tierLabel: '128k',
                 isDualPhase: false,
                 inferred: false
             };
-        }
-        if (key.includes('gemini')) {
-            return {
+        } else if (key.includes('gemini')) {
+            profile = {
                 id: raw,
                 displayName: raw,
                 family: 'gemini',
                 contextLimit: 1000000,
+                compactionLimit: 500000,
                 attentionThreshold: 150000,
                 tierLabel: '1M',
                 isDualPhase: false,
                 inferred: false
             };
+        } else {
+            profile = {
+                id: raw,
+                displayName: raw,
+                family: 'gemini',
+                contextLimit: 1000000,
+                compactionLimit: 500000,
+                attentionThreshold: 150000,
+                tierLabel: '1M',
+                isDualPhase: false,
+                inferred: true
+            };
         }
 
-        return {
-            id: raw,
-            displayName: raw,
-            family: 'gemini',
-            contextLimit: 1000000,
-            attentionThreshold: 150000,
-            tierLabel: '1M',
-            isDualPhase: false,
-            inferred: true
-        };
+        const override = findCustomOverride(customModels, [raw, profile.id, profile.displayName]);
+        return applyCustomOverride(profile, override);
     }
 
     function estimateTokens(text) {
@@ -293,6 +610,7 @@
             return {
                 key: tier.key,
                 label: tier.label,
+                shortLabel: tier.shortLabel,
                 tierLabel: tier.tierLabel,
                 ceiling: tier.ceiling,
                 pct,
@@ -312,24 +630,46 @@
         }
     }
 
+    function isCompactionCheckpointStep(step) {
+        if (!step || step.type !== 'CHECKPOINT') return false;
+        const content = typeof step.content === 'string' ? step.content.trimStart() : '';
+        if (/^#\s*Browser Session Checkpoint\b/i.test(content)) return false;
+        return (
+            /^#\s*Resuming from a compaction\b/i.test(content) ||
+            /^\{\{\s*CHECKPOINT\b/i.test(content)
+        );
+    }
+
     function analyzeTranscriptText(text, opts = {}) {
         const lines = String(text || '').split(/\r?\n/);
-        const weights = makeZeroWeights();
+        const customModels = opts.customModels || null;
+        const compactWarnPctRaw = Number(opts.compactWarnPct);
+        const compactWarnPct = (Number.isFinite(compactWarnPctRaw) && compactWarnPctRaw >= 30 && compactWarnPctRaw <= 95)
+            ? Math.round(compactWarnPctRaw)
+            : BASE_CONFIG.compactWarnPct;
+
+        let weights = makeZeroWeights();
         const modelHistory = [];
         const spawnedSubagents = [];
         const seenSubagentIds = new Set();
-        const pendingTools = [];
+        let pendingTools = [];
+        const compactionHistory = [];
+        const snapshots = [];
 
         let totalSteps = 0;
+        let userInputCount = 0;
         let plannerSteps = 0;
         let firstStepIndex = null;
         let lastStepIndex = null;
+        let maxStepIndex = -Infinity;
         let firstPlannerTokens = null;
         let lastPlanner = null;
         let prevPromptTokens = null;
         let totalOutputTokensGenerated = 0;
         let cacheMissCount = 0;
         let compactionEvents = 0;
+        let rewindEvents = 0;
+        let pendingCompactionEntryIdx = -1;
         let title = '';
         let startedAt = null;
         let updatedAt = null;
@@ -337,6 +677,60 @@
         let currentPhase = 'SINGLE';
         let sawDualPhaseSignal = false;
         let handoffCount = 0;
+
+        function captureSnapshot(stepIndex) {
+            return {
+                stepIndex,
+                weights: { ...weights },
+                modelHistoryLen: modelHistory.length,
+                spawnedSubagentsLen: spawnedSubagents.length,
+                pendingTools: pendingTools.map((t) => ({ ...t })),
+                userInputCount,
+                plannerSteps,
+                firstPlannerTokens,
+                lastPlanner: lastPlanner ? { ...lastPlanner } : null,
+                prevPromptTokens,
+                totalOutputTokensGenerated,
+                cacheMissCount,
+                compactionEvents,
+                compactionHistoryLen: compactionHistory.length,
+                pendingCompactionEntryIdx,
+                currentPhase,
+                sawDualPhaseSignal,
+                handoffCount,
+                title
+            };
+        }
+
+        function rollbackToStepIndex(targetStepIndex) {
+            const restoreIdx = snapshots.findIndex((s) => s.stepIndex >= targetStepIndex);
+            if (restoreIdx === -1) return;
+            const snap = snapshots[restoreIdx];
+            weights = { ...snap.weights };
+            modelHistory.length = snap.modelHistoryLen;
+            spawnedSubagents.length = snap.spawnedSubagentsLen;
+            seenSubagentIds.clear();
+            for (const sub of spawnedSubagents) seenSubagentIds.add(sub.conversationId);
+            pendingTools = snap.pendingTools.map((t) => ({ ...t }));
+            userInputCount = snap.userInputCount;
+            plannerSteps = snap.plannerSteps;
+            firstPlannerTokens = snap.firstPlannerTokens;
+            lastPlanner = snap.lastPlanner ? { ...snap.lastPlanner } : null;
+            prevPromptTokens = snap.prevPromptTokens;
+            totalOutputTokensGenerated = snap.totalOutputTokensGenerated;
+            cacheMissCount = snap.cacheMissCount;
+            compactionEvents = snap.compactionEvents;
+            compactionHistory.length = snap.compactionHistoryLen;
+            pendingCompactionEntryIdx = snap.pendingCompactionEntryIdx;
+            currentPhase = snap.currentPhase;
+            sawDualPhaseSignal = snap.sawDualPhaseSignal;
+            handoffCount = snap.handoffCount;
+            title = snap.title;
+
+            snapshots.length = restoreIdx;
+            maxStepIndex = restoreIdx > 0 ? snapshots[restoreIdx - 1].stepIndex : -Infinity;
+            rewindEvents++;
+        }
 
         for (const rawLine of lines) {
             const trimmed = rawLine.trim();
@@ -349,11 +743,22 @@
             }
             if (!step || typeof step !== 'object') continue;
 
-            totalSteps++;
-            if (typeof step.step_index === 'number') {
-                if (firstStepIndex === null) firstStepIndex = step.step_index;
+            const hasStepIdx = typeof step.step_index === 'number' && Number.isFinite(step.step_index);
+            if (hasStepIdx) {
+                if (step.step_index <= maxStepIndex) {
+                    rollbackToStepIndex(step.step_index);
+                }
+                snapshots.push(captureSnapshot(step.step_index));
+                if (firstStepIndex === null || step.step_index < firstStepIndex) {
+                    firstStepIndex = step.step_index;
+                }
                 lastStepIndex = step.step_index;
+                if (step.step_index > maxStepIndex) {
+                    maxStepIndex = step.step_index;
+                }
             }
+
+            totalSteps++;
             if (step.created_at) {
                 if (!startedAt) startedAt = step.created_at;
                 updatedAt = step.created_at;
@@ -361,14 +766,41 @@
 
             const content = typeof step.content === 'string' ? step.content : '';
 
+            if (step.type === 'CHECKPOINT') {
+                if (isCompactionCheckpointStep(step)) {
+                    pendingTools.length = 0;
+                    const cpIn = Number(step.input_tokens) || 0;
+                    const cpCache = Number(step.cache_read_tokens) || 0;
+                    const cpPrompt = cpIn + cpCache;
+                    const preCompactTokens = cpPrompt > 0 ? cpPrompt : (prevPromptTokens || null);
+
+                    compactionEvents++;
+                    compactionHistory.push({
+                        stepIndex: hasStepIdx ? step.step_index : totalSteps - 1,
+                        timestamp: step.created_at || null,
+                        source: 'checkpoint',
+                        preCompactTokens,
+                        postCompactTokens: null
+                    });
+                    pendingCompactionEntryIdx = compactionHistory.length - 1;
+
+                    // Keep baseline system/mcp/skills; collapse volatile pre-compaction context
+                    weights.files = Math.round(weights.files * 0.12);
+                    weights.terminal = Math.round(weights.terminal * 0.08);
+                    weights.reasoning_subagents = Math.round(weights.reasoning_subagents * 0.10);
+                    weights.messages = Math.max(400, estimateTokens(content));
+                }
+                continue;
+            }
+
             if (step.type === 'USER_INPUT') {
-                // Reset any unclosed pending tool queue from an interrupted previous turn
+                userInputCount++;
                 pendingTools.length = 0;
 
                 for (const ch of extractModelChangesFromUserInput(content)) {
-                    const profile = resolveModelProfile(ch.to);
+                    const profile = resolveModelProfile(ch.to, customModels);
                     modelHistory.push({
-                        stepIndex: step.step_index ?? totalSteps - 1,
+                        stepIndex: hasStepIdx ? step.step_index : totalSteps - 1,
                         timestamp: step.created_at || null,
                         from: ch.from,
                         to: ch.to,
@@ -409,23 +841,35 @@
 
                 totalOutputTokensGenerated += outTok;
 
+                const resumingFromCheckpoint = pendingCompactionEntryIdx >= 0 && compactionHistory[pendingCompactionEntryIdx];
+                if (resumingFromCheckpoint) {
+                    compactionHistory[pendingCompactionEntryIdx].postCompactTokens = promptTok;
+                    pendingCompactionEntryIdx = -1;
+                }
+
                 if (firstPlannerTokens === null) {
                     firstPlannerTokens = promptTok;
                     const preambleBase = Math.max(0, promptTok - weights.messages);
                     if ((firstStepIndex ?? 0) <= 2) {
-                        const effectiveBase = Math.min(preambleBase, 30000);
-                        const mcpBase = Math.round(effectiveBase * (Number(opts.mcpBaselineRatio) || 0.14));
-                        const skillsBase = Math.round(effectiveBase * (Number(opts.skillsBaselineRatio) || 0.20));
-                        const sysBase = Math.max(0, effectiveBase - mcpBase - skillsBase);
+                        const effectiveBase = Math.min(preambleBase, PREAMBLE_BASE_CAP);
+                        let mcpBase = Math.round(effectiveBase * (Number(opts.mcpBaselineRatio) || 0.14));
+                        let skillsBase = Math.round(effectiveBase * (Number(opts.skillsBaselineRatio) || 0.20));
+                        if (mcpBase + skillsBase > CUSTOMIZATION_TOKEN_BUDGET) {
+                            const scale = CUSTOMIZATION_TOKEN_BUDGET / (mcpBase + skillsBase);
+                            mcpBase = Math.round(mcpBase * scale);
+                            skillsBase = Math.max(0, CUSTOMIZATION_TOKEN_BUDGET - mcpBase);
+                        }
+                        const sysBase = Math.min(RULES_TOKEN_BUDGET, Math.max(0, effectiveBase - mcpBase - skillsBase));
                         weights.system_rules += sysBase;
                         weights.mcp += mcpBase;
                         weights.skills += skillsBase;
-                        if (preambleBase > effectiveBase) {
-                            weights.files += preambleBase - effectiveBase;
+                        const allocated = sysBase + mcpBase + skillsBase;
+                        if (preambleBase > allocated) {
+                            weights.files += preambleBase - allocated;
                         }
                     } else {
                         // Rotated / windowed transcript starting mid-conversation
-                        const fixedSystem = Math.min(preambleBase, 18500);
+                        const fixedSystem = Math.min(preambleBase, RULES_TOKEN_BUDGET);
                         weights.system_rules += Math.round(fixedSystem * 0.66);
                         weights.skills += Math.round(fixedSystem * 0.20);
                         weights.mcp += fixedSystem - Math.round(fixedSystem * 0.66) - Math.round(fixedSystem * 0.20);
@@ -436,12 +880,25 @@
                         weights.reasoning_subagents += Math.max(0, carriedHistory - Math.round(carriedHistory * 0.45) - Math.round(carriedHistory * 0.25) - Math.round(carriedHistory * 0.18));
                     }
                 } else {
-                    if (cacheTok === 0 && inTok > 25000) {
+                    if (!resumingFromCheckpoint && cacheTok === 0 && inTok > 25000) {
                         cacheMissCount++;
                     }
-                    if (prevPromptTokens !== null && prevPromptTokens > 30000 && promptTok < prevPromptTokens * 0.78 && (prevPromptTokens - promptTok) > 10000) {
+                    // Fallback monotonic prompt-drop compaction ONLY when no explicit CHECKPOINT preceded this turn
+                    if (
+                        !resumingFromCheckpoint &&
+                        prevPromptTokens !== null &&
+                        prevPromptTokens > 30000 &&
+                        promptTok < prevPromptTokens * 0.78 &&
+                        (prevPromptTokens - promptTok) > 10000
+                    ) {
                         compactionEvents++;
-                        // Reset volatile conversational weights to reflect post-compaction live window
+                        compactionHistory.push({
+                            stepIndex: hasStepIdx ? step.step_index : totalSteps - 1,
+                            timestamp: step.created_at || null,
+                            source: 'prompt_drop',
+                            preCompactTokens: prevPromptTokens,
+                            postCompactTokens: promptTok
+                        });
                         weights.files = Math.round(weights.files * 0.18);
                         weights.terminal = Math.round(weights.terminal * 0.12);
                         weights.reasoning_subagents = Math.round(weights.reasoning_subagents * 0.15);
@@ -451,7 +908,7 @@
 
                 prevPromptTokens = promptTok;
                 lastPlanner = {
-                    stepIndex: step.step_index ?? totalSteps - 1,
+                    stepIndex: hasStepIdx ? step.step_index : totalSteps - 1,
                     inputTokens: inTok,
                     cacheReadTokens: cacheTok,
                     outputTokens: outTok,
@@ -562,17 +1019,31 @@
                 continue;
             }
 
+            if (step.type === 'VIEW_FILE') {
+                weights.files += Math.max(20, estimateTokens(content));
+                continue;
+            }
+
+            if (step.type === 'CONVERSATION_HISTORY') {
+                weights.messages += Math.max(20, estimateTokens(content));
+                continue;
+            }
+
             if (step.type === 'ERROR_MESSAGE') {
                 weights.terminal += Math.max(20, estimateTokens(step.error || content));
             }
         }
 
         const latestSessionModel = modelHistory.length > 0
-            ? resolveModelProfile(modelHistory[modelHistory.length - 1].to)
-            : (opts.globalFallbackModel ? { ...resolveModelProfile(opts.globalFallbackModel), inferred: true } : resolveModelProfile('auto'));
+            ? resolveModelProfile(modelHistory[modelHistory.length - 1].to, customModels)
+            : (opts.globalFallbackModel ? { ...resolveModelProfile(opts.globalFallbackModel, customModels), inferred: true } : resolveModelProfile('auto', customModels));
 
         const hasOverride = Boolean(opts.modelOverride && opts.modelOverride !== 'auto');
-        const activeModel = hasOverride ? resolveModelProfile(opts.modelOverride) : latestSessionModel;
+        const activeModel = hasOverride ? resolveModelProfile(opts.modelOverride, customModels) : latestSessionModel;
+
+        const pendingFirstResponse = plannerSteps === 0 && userInputCount > 0;
+        const rawWeightSum = Object.values(weights).reduce((acc, v) => acc + Math.max(0, Number(v) || 0), 0);
+        const estimatedPendingPromptTokens = pendingFirstResponse ? Math.max(12, Math.round(rawWeightSum)) : 0;
 
         const activeTokens = lastPlanner ? lastPlanner.activeTokens : 0;
         const promptTokens = lastPlanner ? lastPlanner.promptTokens : 0;
@@ -582,32 +1053,69 @@
 
         const contextLimit = activeModel.contextLimit;
         const attentionThreshold = activeModel.attentionThreshold;
+
+        // Effective auto-compaction threshold priority: custom -> observed in session -> observed in history -> model default
+        let compactionLimit = activeModel.compactionLimit || defaultCompactionLimit(contextLimit);
+        let compactionLimitSource = 'default';
+        if (activeModel.customCompactionLimit) {
+            compactionLimit = Math.min(activeModel.customCompactionLimit, contextLimit);
+            compactionLimitSource = 'custom';
+        } else {
+            const sessionObserved = [...compactionHistory]
+                .reverse()
+                .find((c) => c.source === 'checkpoint' && typeof c.preCompactTokens === 'number' && c.preCompactTokens >= 50000 && c.preCompactTokens <= contextLimit);
+            if (sessionObserved) {
+                compactionLimit = sessionObserved.preCompactTokens;
+                compactionLimitSource = 'observed_session';
+            } else if (
+                typeof opts.observedCompactionLimit === 'number' &&
+                Number.isFinite(opts.observedCompactionLimit) &&
+                opts.observedCompactionLimit >= 50000 &&
+                opts.observedCompactionLimit <= contextLimit
+            ) {
+                compactionLimit = Math.round(opts.observedCompactionLimit);
+                compactionLimitSource = 'observed_history';
+            }
+        }
+        compactionLimit = Math.max(1, Math.min(compactionLimit, contextLimit));
+
         const usedPct = Number(((activeTokens / contextLimit) * 100).toFixed(1));
         const remainingTokens = Math.max(0, contextLimit - activeTokens);
         const overflowTokens = Math.max(0, activeTokens - contextLimit);
         const attentionUsedPct = Number(((activeTokens / attentionThreshold) * 100).toFixed(1));
         const cacheHitRatePct = promptTokens > 0 ? Number(((cacheReadTokens / promptTokens) * 100).toFixed(1)) : 0;
 
+        const compactionPct = Number(((activeTokens / compactionLimit) * 100).toFixed(1));
+        const tokensUntilCompaction = Math.max(0, compactionLimit - activeTokens);
+        const imminentPct = Math.max(90, Math.min(98, compactWarnPct + 10));
+        let compactionWarning = 'NONE';
+        if (activeTokens > 0) {
+            if (activeTokens >= compactionLimit || compactionPct >= imminentPct) {
+                compactionWarning = 'IMMINENT';
+            } else if (compactionPct >= compactWarnPct) {
+                compactionWarning = 'APPROACHING';
+            }
+        }
+
         let zone = 'OPTIMAL';
         if (activeTokens >= contextLimit) zone = 'OVERFLOW';
-        else if (usedPct >= 80) zone = 'CRITICAL';
-        else if (activeTokens >= attentionThreshold || usedPct >= 60) zone = 'ATTENTION_WARN';
+        else if (usedPct >= 80 || compactionWarning === 'IMMINENT') zone = 'CRITICAL';
+        else if (activeTokens >= attentionThreshold || usedPct >= 60 || compactionWarning === 'APPROACHING') zone = 'ATTENTION_WARN';
 
         const handoffMatrix = buildHandoffMatrix(activeTokens);
 
-        // Detect cross-model handoff ceiling hazards
         let handoffAlert = null;
         if (activeTokens >= contextLimit) {
             handoffAlert = {
                 severity: 'danger',
-                message: `Context (${activeTokens.toLocaleString()} tok) exceeds ${activeModel.displayName} ceiling (${activeModel.tierLabel}).`
+                message: `Context (${formatFullTokens(activeTokens)} tok) exceeds ${activeModel.displayName} ceiling (${activeModel.tierLabel}).`
             };
         } else if (modelHistory.length > 1) {
             const narrowestSwitch = modelHistory.reduce((min, item) => Math.min(min, item.contextLimit), Infinity);
             if (activeTokens >= narrowestSwitch && contextLimit > narrowestSwitch) {
                 handoffAlert = {
                     severity: 'warn',
-                    message: `Session switched models; current ${activeTokens.toLocaleString()} tok exceeds earlier narrower ${Math.round(narrowestSwitch / 1000)}k ceiling.`
+                    message: `Session switched models; current ${formatFullTokens(activeTokens)} tok exceeds earlier narrower ${Math.round(narrowestSwitch / 1000)}k ceiling.`
                 };
             }
         }
@@ -621,9 +1129,9 @@
             }
         }
 
-        const categories = reconcileCategories(weights, activeTokens);
+        const categories = reconcileCategories(weights, pendingFirstResponse ? estimatedPendingPromptTokens : activeTokens);
 
-        return {
+        const result = {
             title: title || 'Untitled Session',
             startedAt,
             updatedAt,
@@ -632,6 +1140,8 @@
             firstStepIndex: firstStepIndex ?? 0,
             lastStepIndex: lastStepIndex ?? 0,
             rotatedWindow: (firstStepIndex ?? 0) > 2,
+            pendingFirstResponse,
+            estimatedPendingPromptTokens,
             activeTokens,
             promptTokens,
             inputTokens,
@@ -641,11 +1151,20 @@
             cacheHitRatePct,
             cacheMissCount,
             compactionEvents,
+            compactionHistory,
+            compactionLimit,
+            compactionLimitSource,
+            compactionPct,
+            tokensUntilCompaction,
+            compactionWarning,
+            compactWarnPct,
+            rewindEvents,
             activeModel: {
                 id: activeModel.id,
                 displayName: activeModel.displayName,
                 family: activeModel.family,
                 contextLimit,
+                compactionLimit,
                 attentionThreshold,
                 tierLabel: activeModel.tierLabel,
                 isDualPhase: Boolean(activeModel.isDualPhase),
@@ -657,6 +1176,7 @@
                 displayName: latestSessionModel.displayName,
                 family: latestSessionModel.family,
                 contextLimit: latestSessionModel.contextLimit,
+                compactionLimit: latestSessionModel.compactionLimit || defaultCompactionLimit(latestSessionModel.contextLimit),
                 tierLabel: latestSessionModel.tierLabel,
                 inferred: Boolean(latestSessionModel.inferred)
             },
@@ -673,6 +1193,8 @@
             categories,
             subagents: spawnedSubagents
         };
+        result.compactSummary = buildCompactSummary(result);
+        return result;
     }
 
     function createContextAnalyzer(deps = {}) {
@@ -711,56 +1233,194 @@
         }
 
         function getTranscriptPath(brainDir, convId) {
-            if (!convId || !SAFE_ID_RE.test(convId) || /^\.+$/.test(convId)) return null;
+            if (!convId || !SAFE_ID_RE.test(convId) || /^\.+$/.test(convId) || convId.includes('..')) return null;
             return path.join(brainDir, convId, '.system_generated', 'logs', 'transcript.jsonl');
         }
 
-        function readHead(filePath, maxBytes = 8192) {
-            const fd = fs.openSync(filePath, 'r');
-            try {
-                const buf = Buffer.allocUnsafe(maxBytes);
-                const n = fs.readSync(fd, buf, 0, maxBytes, 0);
-                return buf.subarray(0, n).toString('utf8');
-            } finally {
-                fs.closeSync(fd);
+        const summaryCache = new Map();
+        const transcriptMetaCache = new Map();
+
+        function scanTranscriptMeta(tp, mtimeMs, size) {
+            const cacheKey = `${mtimeMs}:${size}`;
+            const cached = transcriptMetaCache.get(tp);
+            if (cached && cached.cacheKey === cacheKey) {
+                return cached.meta;
             }
+            const seenModels = [];
+            const seenSet = new Set();
+            let latestModel = null;
+            let latestModelTs = '';
+            let latestCheckpointPeak = null;
+            let latestCheckpointModelId = null;
+
+            try {
+                const raw = fs.readFileSync(tp, 'utf8');
+                const lines = raw.split(/\r?\n/);
+                let currentModel = null;
+                for (const line of lines) {
+                    if (!line) continue;
+                    const hasModelChange = line.includes('<USER_SETTINGS_CHANGE>') && line.includes('Model Selection');
+                    const hasCheckpoint = line.includes('"CHECKPOINT"');
+                    if (!hasModelChange && !hasCheckpoint) continue;
+                    let step;
+                    try {
+                        step = JSON.parse(line);
+                    } catch {
+                        continue;
+                    }
+                    if (!step || typeof step !== 'object') continue;
+                    if (step.type === 'USER_INPUT' && hasModelChange) {
+                        const changes = extractModelChangesFromUserInput(step.content);
+                        for (const ch of changes) {
+                            currentModel = ch.to;
+                            latestModel = ch.to;
+                            if (typeof step.created_at === 'string') latestModelTs = step.created_at;
+                            const lk = normalizeModelKey(ch.to);
+                            if (lk && !seenSet.has(lk)) {
+                                seenSet.add(lk);
+                                seenModels.push(ch.to);
+                            }
+                        }
+                    } else if (step.type === 'CHECKPOINT' && isCompactionCheckpointStep(step)) {
+                        const cpPrompt = (Number(step.input_tokens) || 0) + (Number(step.cache_read_tokens) || 0);
+                        if (cpPrompt >= 50000) {
+                            latestCheckpointPeak = cpPrompt;
+                            latestCheckpointModelId = currentModel ? resolveModelProfile(currentModel).id : null;
+                        }
+                    }
+                }
+            } catch {}
+
+            const meta = { seenModels, latestModel, latestModelTs, latestCheckpointPeak, latestCheckpointModelId };
+            transcriptMetaCache.set(tp, { cacheKey, meta });
+            return meta;
         }
 
-        const summaryCache = new Map();
-
-        function detectLatestGlobalModel(brainDir) {
+        function listTranscriptFilesSorted(brainDir, maxCount = 20) {
             try {
-                if (!fs.existsSync(brainDir)) return null;
-                const entries = fs.readdirSync(brainDir, { withFileTypes: true })
+                if (!fs.existsSync(brainDir)) return [];
+                return fs.readdirSync(brainDir, { withFileTypes: true })
                     .filter((d) => d.isDirectory() && SAFE_ID_RE.test(d.name))
                     .map((d) => {
                         const tp = getTranscriptPath(brainDir, d.name);
                         let mtimeMs = 0;
+                        let size = 0;
                         try {
-                            if (tp && fs.existsSync(tp)) mtimeMs = fs.statSync(tp).mtimeMs;
+                            if (tp && fs.existsSync(tp)) {
+                                const st = fs.statSync(tp);
+                                mtimeMs = st.mtimeMs;
+                                size = st.size;
+                            }
                         } catch {}
-                        return { id: d.name, tp, mtimeMs };
+                        return { id: d.name, tp, mtimeMs, size };
                     })
                     .filter((x) => x.mtimeMs > 0)
-                    .sort((a, b) => b.mtimeMs - a.mtimeMs);
+                    .sort((a, b) => b.mtimeMs - a.mtimeMs)
+                    .slice(0, maxCount);
+            } catch {
+                return [];
+            }
+        }
 
-                for (const item of entries.slice(0, 8)) {
-                    const head = readHead(item.tp, 8192);
-                    const firstLine = head.split(/\r?\n/)[0];
-                    if (!firstLine) continue;
-                    try {
-                        const step = JSON.parse(firstLine);
-                        if (step && step.type === 'USER_INPUT') {
-                            const changes = extractModelChangesFromUserInput(step.content);
-                            if (changes.length > 0) return changes[changes.length - 1].to;
-                        }
-                    } catch {}
+        function detectLatestGlobalModel(brainDir) {
+            const root = findBrainDir(brainDir);
+            const entries = listTranscriptFilesSorted(root, 12);
+            let bestModel = null;
+            let bestTs = '';
+            for (const item of entries) {
+                const meta = scanTranscriptMeta(item.tp, item.mtimeMs, item.size);
+                if (!meta.latestModel) continue;
+                if (!bestModel) {
+                    bestModel = meta.latestModel;
+                    bestTs = meta.latestModelTs || '';
+                    if (!bestTs) break;
+                } else if (meta.latestModelTs && (!bestTs || meta.latestModelTs > bestTs)) {
+                    bestModel = meta.latestModel;
+                    bestTs = meta.latestModelTs;
                 }
-            } catch {}
+            }
+            return bestModel;
+        }
+
+        function findObservedCompactionLimit(brainDir, modelId) {
+            if (!modelId) return null;
+            const targetKey = canonicalLookupKey(modelId);
+            const entries = listTranscriptFilesSorted(brainDir, 15);
+            for (const item of entries) {
+                const meta = scanTranscriptMeta(item.tp, item.mtimeMs, item.size);
+                if (meta.latestCheckpointPeak && meta.latestCheckpointModelId && canonicalLookupKey(meta.latestCheckpointModelId) === targetKey) {
+                    return meta.latestCheckpointPeak;
+                }
+            }
             return null;
         }
 
-        function readSubagentSummary(brainDir, convId, visited, fallbackHint) {
+        function discoverModels(opts = {}) {
+            const brainDir = opts.brainDir !== undefined ? findBrainDir(opts.brainDir) : findBrainDir();
+            const customModels = sanitizeCustomModels(opts.customModels);
+            const domModels = Array.isArray(opts.domModels) ? opts.domModels : [];
+
+            const merged = [];
+            const seenKeys = new Set();
+
+            function addProfile(rawOrEntry, source) {
+                const isObj = rawOrEntry && typeof rawOrEntry === 'object';
+                const profile = isObj
+                    ? resolveModelProfile(rawOrEntry.id, customModels)
+                    : resolveModelProfile(rawOrEntry, customModels);
+                const kId = canonicalLookupKey(profile.id);
+                const kName = canonicalLookupKey(profile.displayName);
+                if (!kId || seenKeys.has(kId) || (kName && seenKeys.has(kName))) return;
+                seenKeys.add(kId);
+                if (kName) seenKeys.add(kName);
+                merged.push({
+                    id: profile.id,
+                    displayName: profile.displayName,
+                    family: profile.family,
+                    contextLimit: profile.contextLimit,
+                    compactionLimit: profile.compactionLimit || defaultCompactionLimit(profile.contextLimit),
+                    attentionThreshold: profile.attentionThreshold,
+                    tierLabel: profile.tierLabel,
+                    isDualPhase: Boolean(profile.isDualPhase),
+                    source
+                });
+            }
+
+            // 1. Built-in catalog (with custom overrides reflected)
+            for (const m of MODEL_CATALOG) {
+                addProfile(m, 'builtin');
+            }
+
+            // 2. User custom models not already in built-in catalog
+            for (const key of Object.keys(customModels)) {
+                addProfile(key, 'custom');
+            }
+
+            // 3. Recent transcripts in brainDir
+            if (brainDir && fs.existsSync(brainDir)) {
+                const entries = listTranscriptFilesSorted(brainDir, 20);
+                for (const item of entries) {
+                    const meta = scanTranscriptMeta(item.tp, item.mtimeMs, item.size);
+                    for (const modelName of meta.seenModels) {
+                        if (isSafeModelId(modelName) && modelName.toLowerCase() !== 'auto' && modelName.toLowerCase() !== 'none') {
+                            addProfile(modelName, 'transcript');
+                        }
+                    }
+                }
+            }
+
+            // 4. Models observed from Antigravity model picker DOM
+            for (const rawDom of domModels) {
+                if (typeof rawDom !== 'string') continue;
+                const trimmed = rawDom.trim();
+                if (!trimmed || !SAFE_MODEL_RE.test(trimmed) || !DOM_MODEL_NAME_RE.test(trimmed)) continue;
+                addProfile(trimmed, 'dom');
+            }
+
+            return merged;
+        }
+
+        function readSubagentSummary(brainDir, convId, visited, fallbackHint, customModels) {
             if (visited.has(convId)) return null;
             visited.add(convId);
             const tp = getTranscriptPath(brainDir, convId);
@@ -768,7 +1428,8 @@
             try {
                 const raw = fs.readFileSync(tp, 'utf8');
                 const parsed = analyzeTranscriptText(raw, {
-                    globalFallbackModel: fallbackHint || undefined
+                    globalFallbackModel: fallbackHint || undefined,
+                    customModels
                 });
                 return {
                     conversationId: convId,
@@ -792,11 +1453,26 @@
             const raw = fs.readFileSync(tp, 'utf8');
             const ratios = readMcpAndSkillsBaselineRatio(brainDir);
             const globalFallback = opts.globalFallbackModel || detectLatestGlobalModel(brainDir);
+            const customModels = opts.customModels || null;
+
+            // Pre-resolve active model id so we can look up same-model compaction history if needed
+            const meta = scanTranscriptMeta(tp, stat.mtimeMs, stat.size);
+            const effectiveModelRef = (opts.modelOverride && opts.modelOverride !== 'auto')
+                ? opts.modelOverride
+                : (meta.latestModel || globalFallback || 'auto');
+            const resolvedHint = resolveModelProfile(effectiveModelRef, customModels);
+            const observedHistoryLimit = opts.observedCompactionLimit !== undefined
+                ? opts.observedCompactionLimit
+                : findObservedCompactionLimit(brainDir, resolvedHint.id);
+
             const analysis = analyzeTranscriptText(raw, {
                 modelOverride: opts.modelOverride || 'auto',
                 globalFallbackModel: globalFallback,
                 mcpBaselineRatio: ratios.mcpBaselineRatio,
-                skillsBaselineRatio: ratios.skillsBaselineRatio
+                skillsBaselineRatio: ratios.skillsBaselineRatio,
+                compactWarnPct: opts.compactWarnPct,
+                customModels,
+                observedCompactionLimit: observedHistoryLimit
             });
 
             const visited = new Set([convId]);
@@ -804,21 +1480,21 @@
             const enrichedSubagents = analysis.subagents.map((sub) => {
                 let hint = null;
                 if (sub.requestedModel === 'flash') hint = 'gemini-3.8-flash-medium';
-                else if (sub.requestedModel === 'flash_lite') hint = 'gemini-3.8-flash-low';
-                else if (sub.requestedModel === 'pro') hint = 'gemini-4-argon-high';
+                else if (sub.requestedModel === 'flash_lite') hint = 'gemini-3.1-flash-lite';
+                else if (sub.requestedModel === 'pro') hint = 'gemini-4-neon-high';
                 else if (sub.requestedModel === 'inherit' || !sub.requestedModel) hint = analysis.activeModel.id;
-                const summary = readSubagentSummary(brainDir, sub.conversationId, visited, hint);
+                const summary = readSubagentSummary(brainDir, sub.conversationId, visited, hint, customModels);
                 if (summary) offloadedTokens += summary.activeTokens;
                 return {
                     ...sub,
                     activeTokens: summary ? summary.activeTokens : 0,
                     plannerSteps: summary ? summary.plannerSteps : 0,
-                    model: summary ? summary.model : (hint ? resolveModelProfile(hint).displayName : sub.requestedModel),
+                    model: summary ? summary.model : (hint ? resolveModelProfile(hint, customModels).displayName : sub.requestedModel),
                     available: Boolean(summary)
                 };
             });
 
-            return {
+            const full = {
                 conversationId: convId,
                 transcriptPath: tp,
                 fileSize: stat.size,
@@ -827,6 +1503,8 @@
                 subagents: enrichedSubagents,
                 offloadedTokens
             };
+            full.compactSummary = buildCompactSummary(full);
+            return full;
         }
 
         function listRecentConversations(opts = {}) {
@@ -835,6 +1513,9 @@
             const dbDir = findConversationsDbDir(brainDir);
             const limit = Math.max(1, Math.min(50, Number(opts.limit) || 15));
             const globalFallback = detectLatestGlobalModel(brainDir);
+            const customModels = opts.customModels || null;
+            const compactWarnPct = opts.compactWarnPct ?? BASE_CONFIG.compactWarnPct;
+            const customKey = customModels ? JSON.stringify(customModels) : '';
 
             const candidates = [];
             for (const entry of fs.readdirSync(brainDir, { withFileTypes: true })) {
@@ -866,11 +1547,15 @@
             for (const c of candidates.slice(0, limit)) {
                 try {
                     const tpStat = fs.statSync(c.tp);
-                    const cacheKey = `${tpStat.mtimeMs}:${tpStat.size}:${globalFallback || ''}`;
+                    const cacheKey = `${tpStat.mtimeMs}:${tpStat.size}:${globalFallback || ''}:${compactWarnPct}:${customKey}`;
                     let summary = summaryCache.get(c.conversationId);
                     if (!summary || summary.cacheKey !== cacheKey) {
                         const raw = fs.readFileSync(c.tp, 'utf8');
-                        const parsed = analyzeTranscriptText(raw, { globalFallbackModel: globalFallback });
+                        const parsed = analyzeTranscriptText(raw, {
+                            globalFallbackModel: globalFallback,
+                            compactWarnPct,
+                            customModels
+                        });
                         summary = { cacheKey, parsed };
                         summaryCache.set(c.conversationId, summary);
                     }
@@ -882,20 +1567,154 @@
                         activeTokens: s.activeTokens,
                         usedPct: s.usedPct,
                         contextLimit: s.activeModel.contextLimit,
+                        compactionLimit: s.compactionLimit,
+                        compactionPct: s.compactionPct,
+                        compactionWarning: s.compactionWarning,
+                        compactionEvents: s.compactionEvents,
                         tierLabel: s.activeModel.tierLabel,
                         modelName: s.activeModel.displayName,
                         zone: s.zone,
-                        plannerSteps: s.plannerSteps
+                        plannerSteps: s.plannerSteps,
+                        pendingFirstResponse: s.pendingFirstResponse
                     });
                 } catch {}
             }
             return results;
         }
 
+        function resolveContextPayload(params = {}) {
+            const brainDir = findBrainDir(params.brainDir);
+            const rawCfg = params.config && typeof params.config === 'object' ? params.config : {};
+            const cleanCfg = sanitizeSettings(rawCfg);
+            const cfg = {
+                ...BASE_CONFIG,
+                ...cleanCfg,
+                customModels: cleanCfg.customModels ? { ...cleanCfg.customModels } : {}
+            };
+
+            const effectiveModelOverride = (typeof params.modelOverride === 'string' && isSafeModelId(params.modelOverride))
+                ? params.modelOverride.trim()
+                : cfg.modelOverride;
+
+            const analyzeOpts = {
+                brainDir,
+                modelOverride: effectiveModelOverride,
+                compactWarnPct: cfg.compactWarnPct,
+                customModels: cfg.customModels
+            };
+
+            const recent = listRecentConversations({
+                brainDir,
+                limit: params.limit || 15,
+                compactWarnPct: cfg.compactWarnPct,
+                customModels: cfg.customModels
+            });
+
+            const discoveredModels = discoverModels({
+                brainDir,
+                customModels: cfg.customModels,
+                domModels: params.domModels
+            });
+
+            const globalFallback = detectLatestGlobalModel(brainDir);
+            const defProf = resolveModelProfile(
+                effectiveModelOverride && effectiveModelOverride !== 'auto'
+                    ? effectiveModelOverride
+                    : (globalFallback || 'auto'),
+                cfg.customModels
+            );
+            const defaultModel = {
+                id: defProf.id,
+                displayName: defProf.displayName,
+                family: defProf.family,
+                contextLimit: defProf.contextLimit,
+                compactionLimit: defProf.compactionLimit || defaultCompactionLimit(defProf.contextLimit),
+                attentionThreshold: defProf.attentionThreshold,
+                tierLabel: defProf.tierLabel,
+                isDualPhase: Boolean(defProf.isDualPhase)
+            };
+
+            const safeNonAuto = (v) => (typeof v === 'string' && isSafeConvId(v) && v.trim() !== 'auto') ? v.trim() : '';
+            const reqId = safeNonAuto(params.requestedConvId);
+            const manualId = safeNonAuto(cfg.selectedConvId);
+            const renId = safeNonAuto(params.rendererConvId);
+            const hstId = safeNonAuto(params.hostConvId);
+
+            let sessionState = 'no_sessions';
+            let resolvedBy = 'none';
+            let targetConversationId = '';
+            let analysis = null;
+
+            if (reqId) {
+                targetConversationId = reqId;
+                analysis = analyzeConversationDir(reqId, analyzeOpts);
+                resolvedBy = 'manual';
+                sessionState = analysis ? (analysis.pendingFirstResponse ? 'pending' : 'active') : 'empty_new';
+            } else if (manualId) {
+                targetConversationId = manualId;
+                analysis = analyzeConversationDir(manualId, analyzeOpts);
+                resolvedBy = 'manual';
+                sessionState = analysis ? (analysis.pendingFirstResponse ? 'pending' : 'active') : 'empty_new';
+            } else if (renId) {
+                targetConversationId = renId;
+                analysis = analyzeConversationDir(renId, analyzeOpts);
+                if (analysis) {
+                    resolvedBy = 'renderer';
+                    sessionState = analysis.pendingFirstResponse ? 'pending' : 'active';
+                } else {
+                    resolvedBy = 'empty_new';
+                    sessionState = 'empty_new';
+                }
+            } else if (hstId) {
+                targetConversationId = hstId;
+                analysis = analyzeConversationDir(hstId, analyzeOpts);
+                if (analysis) {
+                    resolvedBy = 'host';
+                    sessionState = analysis.pendingFirstResponse ? 'pending' : 'active';
+                } else {
+                    resolvedBy = 'empty_new';
+                    sessionState = 'empty_new';
+                }
+            } else if (params.isNewSessionUi === true) {
+                resolvedBy = 'empty_new';
+                sessionState = 'empty_new';
+                targetConversationId = '';
+                analysis = null;
+            } else if (recent.length > 0) {
+                targetConversationId = recent[0].conversationId;
+                analysis = analyzeConversationDir(targetConversationId, analyzeOpts);
+                resolvedBy = analysis ? 'latest_activity' : 'none';
+                sessionState = analysis ? (analysis.pendingFirstResponse ? 'pending' : 'active') : 'no_sessions';
+            }
+
+            return {
+                config: cfg,
+                sessionState,
+                resolvedBy,
+                targetConversationId,
+                hostConversationId: hstId,
+                defaultModel,
+                modelCatalog: discoveredModels,
+                discoveredModels,
+                recentConversations: recent,
+                analysis
+            };
+        }
+
         return {
             MODEL_CATALOG,
             MODEL_TIERS,
             CATEGORY_META,
+            BASE_CONFIG,
+            SAFE_MODEL_RE,
+            SAFE_CONV_RE,
+            isSafeModelId,
+            isSafeConvId,
+            sanitizeCustomModels,
+            sanitizeSettings,
+            formatTokens,
+            formatFullTokens,
+            buildCompactSummary,
             resolveModelProfile,
             estimateTokens,
             classifyToolName,
@@ -903,6 +1722,9 @@
             analyzeTranscriptText,
             analyzeConversationDir,
             listRecentConversations,
+            detectLatestGlobalModel,
+            discoverModels,
+            resolveContextPayload,
             findBrainDir
         };
     }
@@ -911,6 +1733,17 @@
         MODEL_CATALOG,
         MODEL_TIERS,
         CATEGORY_META,
+        BASE_CONFIG,
+        SAFE_MODEL_RE,
+        SAFE_CONV_RE,
+        isSafeModelId,
+        isSafeConvId,
+        sanitizeCustomModels,
+        sanitizeSettings,
+        createSettingsStore,
+        formatTokens,
+        formatFullTokens,
+        buildCompactSummary,
         resolveModelProfile,
         estimateTokens,
         classifyToolName,
